@@ -29,6 +29,9 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".TranslatorImeService$AudioPermissionActivity"
+            android:exported="false" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
         <activity android:name=".VoiceTranslateActivity" android:exported="false" />
         <activity android:name=".HistoryActivity" android:exported="false" />
 
