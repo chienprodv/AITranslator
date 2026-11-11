@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
     private TextView configHint;
     private TextView screenStatus;
     private boolean pendingScreenStart;
+    private TextView usageView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +57,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         updateScreenStatus();
+        if (usageView != null) usageView.setText(ApiClient.usageSummary(this));
         if (pendingScreenStart && Settings.canDrawOverlays(this)) {
             pendingScreenStart = false;
             requestScreenCapture();
@@ -71,7 +73,7 @@ public class MainActivity extends Activity {
 
         root.addView(text("Ngọc Thọ AI Translator", 25, true));
         root.addView(text(
-                "Bản 1.0 — bàn phím Việt→Trung, dịch ngược bắt buộc, chọn vùng màn hình để OCR, dịch giọng nói hai chiều, cache/từ điển cục bộ và chế độ proxy an toàn.",
+                "Bản 1.1 — câu đã lưu, ký hiệu, emoji, micro ngay trên bàn phím Việt→Trung, dịch ngược bắt buộc, chọn vùng màn hình để OCR, dịch giọng nói hai chiều, cache/từ điển cục bộ và chế độ proxy an toàn.",
                 14, false));
 
         addSpacer(root, 16);
@@ -144,6 +146,66 @@ public class MainActivity extends Activity {
         save.setOnClickListener(v -> saveSettings());
         root.addView(save);
 
+        addSpacer(root, 18);
+        root.addView(text("Bảo vệ API và sử dụng", 19, true));
+        usageView = text(ApiClient.usageSummary(this), 13, false);
+        root.addView(usageView);
+        EditText daily = field("Giới hạn lượt gọi/ngày (1–10000)", false);
+        daily.setInputType(InputType.TYPE_CLASS_NUMBER); daily.setText(String.valueOf(ApiClient.dailyLimit(this)));
+        root.addView(daily);
+        EditText minute = field("Giới hạn lượt gọi/phút (1–60)", false);
+        minute.setInputType(InputType.TYPE_CLASS_NUMBER); minute.setText(String.valueOf(ApiClient.minuteLimit(this)));
+        root.addView(minute);
+        Button limits = button("LƯU GIỚI HẠN / CẬP NHẬT SỬ DỤNG");
+        limits.setOnClickListener(v -> {
+            try { ApiClient.setLimits(this, Integer.parseInt(daily.getText().toString()), Integer.parseInt(minute.getText().toString())); }
+            catch (NumberFormatException e) { Toast.makeText(this, "Nhập số lượt gọi hợp lệ.", Toast.LENGTH_SHORT).show(); return; }
+            daily.setText(String.valueOf(ApiClient.dailyLimit(this))); minute.setText(String.valueOf(ApiClient.minuteLimit(this)));
+            usageView.setText(ApiClient.usageSummary(this));
+        });
+        root.addView(limits);
+        root.addView(text("Hạn mức tiền VNĐ (ước tính)", 17, true));
+        EditText budgetAmount = field("Hạn mức VNĐ, ví dụ 5000 hoặc 10000", false);
+        budgetAmount.setInputType(InputType.TYPE_CLASS_NUMBER);
+        budgetAmount.setText(String.valueOf(VndBudget.limit(this))); root.addView(budgetAmount);
+        LinearLayout presets = new LinearLayout(this);
+        for (int value : new int[]{5000, 10000, 20000, 50000}) {
+            Button preset = button(String.format(new java.util.Locale("vi", "VN"), "%,dđ", value));
+            preset.setOnClickListener(v -> budgetAmount.setText(String.valueOf(value)));
+            presets.addView(preset, new LinearLayout.LayoutParams(0, dp(44), 1));
+        }
+        root.addView(presets);
+        Spinner budgetPeriod = new Spinner(this);
+        budgetPeriod.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"Mỗi tháng", "Mỗi ngày"}));
+        budgetPeriod.setSelection(VndBudget.monthly(this) ? 0 : 1); root.addView(budgetPeriod);
+        EditText budgetFx = field("Tỷ giá quy đổi VNĐ cho 1 USD", false);
+        budgetFx.setInputType(InputType.TYPE_CLASS_NUMBER); budgetFx.setText(String.valueOf(VndBudget.exchangeRate(this))); root.addView(budgetFx);
+        EditText priceIn = field("USD / 1 triệu token đầu vào", false);
+        EditText priceOut = field("USD / 1 triệu token đầu ra", false);
+        priceIn.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        priceOut.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        double inPrice = VndBudget.inputRate(this), outPrice = VndBudget.outputRate(this);
+        priceIn.setText(inPrice > 0 ? String.valueOf(inPrice) : "0.3");
+        priceOut.setText(outPrice > 0 ? String.valueOf(outPrice) : "1.2");
+        root.addView(priceIn); root.addView(priceOut);
+        root.addView(text("Đơn giá tham khảo DeepSeek Flash: vào $0.30, ra $1.20 / triệu token (giờ cao điểm, chưa trừ cache); tỷ giá 25.820đ/USD, kiểm tra 11/11/2026. Nếu dùng model khác, cập nhật đúng đơn giá trước khi lưu. App dự trù trước mỗi lượt, đối chiếu token khi có usage, cảnh báo còn 20% và chặn khi không đủ hạn mức. Không tự nạp tiền.", 12, false));
+        Button saveBudget = button("LƯU HẠN MỨC VNĐ + CẤU HÌNH AI");
+        saveBudget.setOnClickListener(v -> {
+            try {
+                long cap = Long.parseLong(budgetAmount.getText().toString().replace(".", "").replace(",", "").replace("đ", "").trim());
+                long fx = Long.parseLong(budgetFx.getText().toString().replace(".", "").replace(",", "").trim());
+                double inRate = Double.parseDouble(priceIn.getText().toString().replace(',', '.'));
+                double outRate = Double.parseDouble(priceOut.getText().toString().replace(',', '.'));
+                saveSettings();
+                VndBudget.configure(this, cap, budgetPeriod.getSelectedItemPosition() == 0, fx, inRate, outRate);
+                usageView.setText(ApiClient.usageSummary(this));
+                Toast.makeText(this, "Đã lưu hạn mức VNĐ. Các khoản đã dùng vẫn được giữ.", Toast.LENGTH_LONG).show();
+            } catch (Exception e) { Toast.makeText(this, "Không lưu được: " + e.getMessage(), Toast.LENGTH_LONG).show(); }
+        });
+        root.addView(saveBudget);
+
+
         addSpacer(root, 20);
         root.addView(text("3. Bàn phím AI", 19, true));
         root.addView(text(
@@ -195,6 +257,7 @@ public class MainActivity extends Activity {
 
         addSpacer(root, 20);
         root.addView(text("5. Dịch giọng nói", 19, true));
+        root.addView(text("Bấm 🎤 ngay trên bàn phím để nói và dịch tại ô chat. Giữ 🎤 đổi chiều Việt/Trung. Cho phép micro một lần. Bản nhận dạng phụ thuộc dịch vụ giọng nói Android của máy.", 13, false));
         Button voice = button("MỞ DỊCH GIỌNG NÓI HAI CHIỀU");
         voice.setOnClickListener(v -> startActivity(new Intent(this, VoiceTranslateActivity.class)));
         root.addView(voice);
