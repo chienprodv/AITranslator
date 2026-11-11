@@ -1,0 +1,8 @@
+name = "ngoc-tho-ai-translator"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+# Store secrets with commands, never commit them:
+# npx wrangler secret put AUTH_TOKEN
+# npx wrangler secret put DEEPSEEK_API_KEY
+# npx wrangler secret put OPENAI_API_KEY

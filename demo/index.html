@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ngọc Thọ AI Translator — Demo</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#171717;background:#eef1f4}*{box-sizing:border-box}body{margin:0;padding:24px}.phone{max-width:430px;margin:auto;background:#fff;border-radius:28px;box-shadow:0 18px 60px #0002;overflow:hidden;border:1px solid #d7dce2}.top{padding:20px 20px 12px;background:#16191d;color:#fff}.top h1{font-size:20px;margin:0 0 4px}.top p{font-size:12px;opacity:.72;margin:0}.tabs{display:flex;background:#20242a}.tab{flex:1;padding:12px 4px;border:0;background:transparent;color:#adb4bd;font-weight:700}.tab.active{color:#fff;border-bottom:3px solid #fff}.panel{display:none;padding:16px}.panel.active{display:block}.label{font-size:12px;font-weight:800;color:#59616d;margin:12px 0 5px;text-transform:uppercase}.box,textarea{width:100%;border:1px solid #d9dde3;border-radius:12px;padding:12px;background:#f9fafb;font-size:15px;line-height:1.4}.zh{font-size:18px;font-weight:700}.back{background:#eef7ef;border-color:#b8ddbd}.quality{display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:700}.ok{color:#207b34}.warn{color:#a65a00}.actions{display:flex;gap:8px;margin-top:12px}.btn{flex:1;border:0;border-radius:12px;padding:12px 10px;font-weight:800;background:#1d2228;color:#fff}.btn.alt{background:#e9edf1;color:#20252b}.keyboard{margin:16px -16px -16px;padding:9px;background:#dfe3e8}.keys{display:flex;gap:4px;margin:4px 0}.key{flex:1;background:white;border:0;border-radius:7px;padding:10px 2px;box-shadow:0 1px 2px #0002}.screen{height:460px;border-radius:18px;background:linear-gradient(#f7efe5,#fafafa);padding:18px;position:relative;overflow:hidden}.cn-card{background:#fff;border-radius:12px;padding:12px;box-shadow:0 4px 18px #0001;margin-top:60px}.selection{border:3px solid #fff;outline:999px solid #0006;border-radius:8px;position:absolute;left:28px;right:28px;top:98px;height:155px;pointer-events:none}.bubble{position:absolute;right:12px;bottom:90px;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;font-size:23px;font-weight:700}.result-pop{margin-top:12px;background:#fff;border:1px solid #d9dde3;border-radius:12px;padding:12px}.mic{width:90px;height:90px;border-radius:50%;border:0;background:#191d22;color:#fff;font-size:32px;display:block;margin:24px auto 14px}.small{font-size:12px;color:#6b7280}.demo{font-size:11px;background:#fff3cd;color:#785c00;padding:8px 12px;text-align:center}.status{min-height:18px;font-size:12px;color:#6b7280;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="demo">DEMO giao diện — không gửi dữ liệu lên AI</div>
+  <div class="top"><h1>Ngọc Thọ AI Translator</h1><p>VI ↔ 中文 · dịch ngược bắt buộc</p></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="keyboard">Bàn phím</button>
+    <button class="tab" data-tab="screen">Màn hình</button>
+    <button class="tab" data-tab="voice">Giọng nói</button>
+  </div>
+
+  <section id="keyboard" class="panel active">
+    <div class="label">Gõ tiếng Việt</div>
+    <textarea id="input" rows="3">Nếu tôi lấy 500 cái thì giá tốt nhất là bao nhiêu?</textarea>
+    <div class="status" id="status">Tự dịch sau 500 ms…</div>
+    <div class="label">Ý của bạn là</div><div class="box" id="intent">—</div>
+    <div class="label">中文</div><div class="box zh" id="zh">—</div>
+    <div class="label">Dịch ngược kiểm tra</div><div class="box back" id="back">—</div>
+    <div class="quality"><span id="quality" class="ok">—</span></div>
+    <div class="actions"><button class="btn" id="insert">CHÈN 中文</button><button class="btn alt" id="speak">🔊 Đọc</button></div>
+    <div class="keyboard" id="kbd"></div>
+  </section>
+
+  <section id="screen" class="panel">
+    <div class="screen">
+      <div class="cn-card"><b>源头厂家 · 现货供应</b><br>批发价 ¥26.80<br>最低100个起订<br>预计3天发货</div>
+      <div class="selection"></div><div class="bubble">译</div>
+    </div>
+    <div class="actions"><button class="btn" id="screenTranslate">DỊCH VÙNG ĐÃ CHỌN</button></div>
+    <div id="screenResult" class="result-pop">Kéo chọn vùng trên Android thật; demo này dùng vùng mẫu.</div>
+  </section>
+
+  <section id="voice" class="panel">
+    <button class="mic" id="mic">🎤</button>
+    <div class="small" style="text-align:center">Bấm micro và nói tiếng Việt. Nếu trình duyệt không hỗ trợ, demo sẽ nạp câu mẫu.</div>
+    <div class="label">Tôi nghe được</div><div class="box" id="heard">—</div>
+    <div class="label">中文</div><div class="box zh" id="voiceZh">—</div>
+    <div class="label">Dịch ngược</div><div class="box back" id="voiceBack">—</div>
+    <div class="actions"><button class="btn alt" id="voiceSpeak">🔊 Đọc tiếng Trung</button></div>
+  </section>
+</div>
+<script>
+const $=s=>document.querySelector(s); let timer, lastZh='';
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#'+b.dataset.tab).classList.add('active')});
+function trans(s){const q=(s.match(/\b(\d+)\b/)||[])[1]||'';const n=s.toLowerCase();if(q&&(/giá tốt nhất|giá thấp nhất|giá bao nhiêu/.test(n)))return{intent:`Nếu tôi đặt ${q} cái, giá tốt nhất bên bạn có thể báo là bao nhiêu?`,zh:`如果我订${q}个，你们能给我的最优惠价格是多少？`,back:`Nếu tôi đặt ${q} cái, mức giá ưu đãi nhất bên bạn có thể đưa ra là bao nhiêu?`,score:99};if(/còn hàng/.test(n))return{intent:'Bên bạn còn hàng không?',zh:'你们还有现货吗？',back:'Bên bạn còn hàng sẵn không?',score:100};if(/giá cao/.test(n))return{intent:'Giá này hơi cao. Nếu hợp tác lâu dài, bên bạn có thể ưu đãi thêm không?',zh:'这个价格有点高，如果长期合作，能不能再优惠一些？',back:'Giá này hơi cao. Nếu hợp tác lâu dài, bên bạn có thể ưu đãi thêm một chút không?',score:99};if(/mẫu|lấy thử/.test(n))return{intent:'Tôi muốn xem mẫu trước khi đặt số lượng lớn.',zh:'我想先看一下样品，再决定是否大批量订购。',back:'Tôi muốn xem mẫu trước, sau đó mới quyết định có đặt số lượng lớn hay không.',score:97};return{intent:s,zh:'[DEMO] Hãy dùng câu mẫu để xem bản dịch cục bộ.',back:'[DEMO] Chưa dịch tự do vì demo không gọi AI.',score:0}}
+function render(){const s=$('#input').value.trim();if(!s)return;$('#status').textContent='Đang dịch nhanh + kiểm tra ngược…';const r=trans(s);setTimeout(()=>{$('#intent').textContent=r.intent;$('#zh').textContent=r.zh;$('#back').textContent=r.back;$('#quality').textContent=r.score?`✓ Sát nghĩa ${r.score}%`:'Chế độ demo';$('#quality').className=r.score?'ok':'warn';lastZh=r.zh;$('#status').textContent=r.score?'⚡ Phản hồi cục bộ, không cần mạng':'Demo chỉ hỗ trợ câu mẫu'},220)}
+$('#input').oninput=()=>{clearTimeout(timer);$('#status').textContent='Đợi bạn ngừng gõ…';timer=setTimeout(render,500)};render();
+$('#insert').onclick=()=>alert('Trên APK thật, câu Trung sẽ được chèn trực tiếp vào ô chat đang mở.\n\n'+lastZh);
+function say(text,lang='zh-CN'){if(!text)return;const u=new SpeechSynthesisUtterance(text);u.lang=lang;speechSynthesis.cancel();speechSynthesis.speak(u)}
+$('#speak').onclick=()=>say(lastZh);$('#voiceSpeak').onclick=()=>say($('#voiceZh').textContent);
+$('#screenTranslate').onclick=()=>{$('#screenResult').innerHTML='<b>Tiếng Việt</b><br>Nhà sản xuất trực tiếp · Có sẵn hàng<br>Giá sỉ ¥26,80<br>Tối thiểu 100 cái mới nhận đơn<br>Dự kiến giao hàng trong 3 ngày<br><br><span class="ok">✓ Chỉ vùng đã chọn được OCR</span>'};
+const rows=['1234567890','qwertyuiop','asdfghjkl','zxcvbnm'];const kbd=$('#kbd');rows.forEach(row=>{const d=document.createElement('div');d.className='keys';[...row].forEach(c=>{const b=document.createElement('button');b.className='key';b.textContent=c;b.onclick=()=>{$('#input').value+=c;$('#input').dispatchEvent(new Event('input'))};d.appendChild(b)});kbd.appendChild(d)});
+$('#mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){voiceDemo('Nếu tôi lấy 500 cái thì giá tốt nhất là bao nhiêu?');return}const r=new SR();r.lang='vi-VN';r.interimResults=true;$('#heard').textContent='Đang nghe…';r.onresult=e=>{let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;$('#heard').textContent=t;if(e.results[e.results.length-1].isFinal)voiceDemo(t)};r.onerror=()=>voiceDemo('Nếu tôi lấy 500 cái thì giá tốt nhất là bao nhiêu?');r.start()};
+function voiceDemo(t){const r=trans(t);$('#heard').textContent=t;$('#voiceZh').textContent=r.zh;$('#voiceBack').textContent=r.back}
+</script>
+</body></html>

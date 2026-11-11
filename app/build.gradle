@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Optional signing.properties for local release builds.
+def signingPropsFile = rootProject.file('signing.properties')
+def signingProps = new java.util.Properties()
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+}
+
+android {
+    namespace 'com.ngoctho.aitranslator'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.ngoctho.aitranslator'
+        minSdk 26
+        targetSdk 36
+        versionCode 10
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (signingPropsFile.exists()) {
+                storeFile rootProject.file(signingProps['storeFile'])
+                storePassword signingProps['storePassword']
+                keyAlias signingProps['keyAlias']
+                keyPassword signingProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (signingPropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Bundled OCR models: no first-use model download, prioritizing speed.
+    implementation 'com.google.mlkit:text-recognition:16.0.1'
+    implementation 'com.google.mlkit:text-recognition-chinese:16.0.1'
+}

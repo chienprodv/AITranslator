@@ -1,0 +1,4 @@
+storeFile=keystore/ngoctho-release.jks
+storePassword=CHANGE_ME
+keyAlias=ngoctho
+keyPassword=CHANGE_ME

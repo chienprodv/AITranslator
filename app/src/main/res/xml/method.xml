@@ -1,0 +1,7 @@
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.ngoctho.aitranslator.MainActivity">
+    <subtype
+        android:label="@string/ime_name"
+        android:imeSubtypeLocale="vi_VN"
+        android:imeSubtypeMode="keyboard" />
+</input-method>
