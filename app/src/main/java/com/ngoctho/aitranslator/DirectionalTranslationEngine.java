@@ -34,7 +34,7 @@ public final class DirectionalTranslationEngine {
         final String provider = AppPrefs.provider(context);
         final String model = AppPrefs.model(context);
         final String ctx = AppPrefs.businessContext(context);
-        final String key = provider + "|" + model + "|" + ctx + "|" + dir + "|" + text.toLowerCase(Locale.ROOT);
+        final String key = provider + "|" + AppPrefs.glossary(context) + "|" + AppPrefs.businessContext(context) + "|" + model + "|" + ctx + "|" + dir + "|" + text;
 
         BiTranslationResult cached = CACHE.get(key);
         if (cached != null) {
