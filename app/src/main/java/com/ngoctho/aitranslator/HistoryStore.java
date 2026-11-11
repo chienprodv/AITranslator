@@ -58,6 +58,43 @@ public final class HistoryStore {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().remove(KEY).apply();
     }
 
+    /** Explicitly saved phrases survive cache eviction and app restarts. */
+    public static synchronized void savePhrase(Context context, String source, String target, String back) {
+        if (target == null || target.trim().isEmpty()) return;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE);
+            JSONArray old = savedPhrases(context);
+            JSONArray next = new JSONArray();
+            next.put(new JSONObject().put("source", safe(source)).put("target", safe(target))
+                    .put("back", safe(back)).put("time", System.currentTimeMillis()));
+            for (int i = 0; i < old.length() && next.length() < MAX_ITEMS; i++) {
+                JSONObject item = old.optJSONObject(i);
+                if (item != null && !(item.optString("source").equals(safe(source))
+                        && item.optString("target").equals(safe(target)))) next.put(item);
+            }
+            prefs.edit().putString("saved_phrases", next.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    public static synchronized JSONArray savedPhrases(Context context) {
+        try {
+            return new JSONArray(context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+                    .getString("saved_phrases", "[]"));
+        } catch (Exception ignored) { return new JSONArray(); }
+    }
+
+    public static synchronized void removePhrase(Context context, String source, String target) {
+        JSONArray old = savedPhrases(context);
+        JSONArray next = new JSONArray();
+        for (int i = 0; i < old.length(); i++) {
+            JSONObject item = old.optJSONObject(i);
+            if (item != null && !(item.optString("source").equals(source)
+                    && item.optString("target").equals(target))) next.put(item);
+        }
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+                .putString("saved_phrases", next.toString()).apply();
+    }
+
     public static String formatTime(long time) {
         return new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(new Date(time));
     }
