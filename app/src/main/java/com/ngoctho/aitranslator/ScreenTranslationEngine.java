@@ -29,7 +29,7 @@ public final class ScreenTranslationEngine {
         }
         final String provider = AppPrefs.provider(context);
         final String model = AppPrefs.model(context);
-        final String key = provider + "|" + model + "|screen|" + text.toLowerCase(Locale.ROOT);
+        final String key = provider + "|" + model + "|screen|" + text;
 
         ScreenTranslationResult cached = CACHE.get(key);
         if (cached != null) {
