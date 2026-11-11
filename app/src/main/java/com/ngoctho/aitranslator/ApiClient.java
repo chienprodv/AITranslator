@@ -1,6 +1,15 @@
 package com.ngoctho.aitranslator;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.widget.Toast;
+import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
+import java.util.Date;
+import java.util.Locale;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -96,17 +105,24 @@ public final class ApiClient {
         String glossary = AppPrefs.glossary(context);
         String prompt = promptFor(task, direction, businessContext, glossary);
 
-        if (AppPrefs.isProxy(provider)) {
-            return callProxy(context, upstream, model, task, direction, source, businessContext, glossary);
-        }
-
-        String apiKey = AppPrefs.apiKey(context, provider);
-        if (apiKey.isEmpty()) throw new IllegalArgumentException("Chưa nhập API key trong ứng dụng.");
-
-        if (AppPrefs.PROVIDER_OPENAI.equals(upstream)) {
-            return callOpenAI(apiKey, model, prompt, source, maxTokens, task);
-        }
-        return callDeepSeek(apiKey, model, prompt, source, maxTokens);
+        if (!AppPrefs.isReady(context)) throw new IllegalArgumentException("Chưa cấu hình API/proxy.");
+        acquire(context);
+        boolean success = false;
+        try {
+            REQUEST_TICKET.set(VndBudget.reserve(context, source, prompt, maxTokens));
+            String result;
+            if (AppPrefs.isProxy(provider)) {
+                result = callProxy(context, upstream, model, task, direction, source, businessContext, glossary);
+            } else {
+                String apiKey = AppPrefs.apiKey(context, provider);
+                if (apiKey.isEmpty()) throw new IllegalArgumentException("Chưa nhập API key.");
+                result = AppPrefs.PROVIDER_OPENAI.equals(upstream)
+                        ? callOpenAI(apiKey, model, prompt, source, maxTokens, task)
+                        : callDeepSeek(apiKey, model, prompt, source, maxTokens);
+            }
+            success = true;
+            return result;
+        } finally { VndBudget.warnIfLow(context); release(success); }
     }
 
     private static String promptFor(
@@ -251,7 +267,7 @@ public final class ApiClient {
             String systemPrompt,
             String source,
             int maxTokens) throws Exception {
-        for (int attempt = 0; attempt < 2; attempt++) {
+        for (int attempt = 0; attempt < 1; attempt++) {
             JSONObject body = new JSONObject();
             body.put("model", blankTo(model, "deepseek-flash"));
             JSONArray messages = new JSONArray();
@@ -275,7 +291,7 @@ public final class ApiClient {
                 if (!content.trim().isEmpty()) return content;
             }
         }
-        throw new IllegalStateException("DeepSeek trả về nội dung rỗng sau khi thử lại.");
+        throw new IllegalStateException("DeepSeek trả về nội dung rỗng. Không tự thử lại để tránh phát sinh phí.");
     }
 
     private static String callProxy(
@@ -355,7 +371,100 @@ public final class ApiClient {
             throw new IllegalStateException("API lỗi " + code + ": " + trim(detail, 700));
         }
         if (text.trim().isEmpty()) throw new IllegalStateException("Server trả về nội dung rỗng.");
-        return new JSONObject(text);
+        JSONObject response = new JSONObject(text);
+        recordUsage(response);
+        return response;
+    }
+
+
+    private static final Object SPEND_LOCK = new Object();
+    private static final ArrayDeque<Long> RECENT_CALLS = new ArrayDeque<>();
+    private static final ThreadLocal<Context> REQUEST_CONTEXT = new ThreadLocal<>();
+    private static final ThreadLocal<VndBudget.Ticket> REQUEST_TICKET = new ThreadLocal<>();
+    private static boolean activeCall;
+    private static int failures;
+    private static long pausedUntil;
+
+    private static SharedPreferences usagePrefs(Context context) {
+        return context.getSharedPreferences("api_usage", Context.MODE_PRIVATE);
+    }
+    private static String today() { return new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date()); }
+    private static int bounded(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
+    public static int dailyLimit(Context context) { return bounded(usagePrefs(context).getInt("daily_limit", 200), 1, 10000); }
+    public static int minuteLimit(Context context) { return bounded(usagePrefs(context).getInt("minute_limit", 12), 1, 60); }
+    public static void setLimits(Context context, int day, int minute) {
+        usagePrefs(context).edit().putInt("daily_limit", bounded(day, 1, 10000))
+                .putInt("minute_limit", bounded(minute, 1, 60)).apply();
+    }
+
+    private static void acquire(Context context) {
+        synchronized (SPEND_LOCK) {
+            long now = SystemClock.elapsedRealtime();
+            if (activeCall) throw new IllegalStateException("Đang có yêu cầu AI chạy. Chờ hoàn tất; không gửi thêm.");
+            if (now < pausedUntil) throw new IllegalStateException("AI lỗi liên tiếp; tạm nghỉ 60 giây để tránh gọi lặp.");
+            while (!RECENT_CALLS.isEmpty() && now - RECENT_CALLS.peekFirst() >= 60000) RECENT_CALLS.removeFirst();
+            if (RECENT_CALLS.size() >= minuteLimit(context)) throw new IllegalStateException("Đã chạm giới hạn lượt gọi/phút. Chờ một lát.");
+            SharedPreferences prefs = usagePrefs(context);
+            String day = today();
+            boolean sameDay = day.equals(prefs.getString("day", ""));
+            int used = sameDay ? prefs.getInt("calls", 0) : 0;
+            int limit = dailyLimit(context);
+            if (used >= limit) throw new IllegalStateException("Đã hết " + limit + " lượt gọi hôm nay. Đổi giới hạn trong Cài đặt nếu cần.");
+            SharedPreferences.Editor editor = prefs.edit().putString("day", day).putInt("calls", used + 1);
+            if (!sameDay) editor.putLong("input_tokens", 0).putLong("output_tokens", 0).putInt("metered", 0);
+            if ((used + 1) * 5 >= limit * 4 && !day.equals(prefs.getString("warned_day", ""))) {
+                editor.putString("warned_day", day);
+                Context app = context.getApplicationContext();
+                new Handler(Looper.getMainLooper()).post(() -> Toast.makeText(app,
+                        "Còn tối đa 20% lượt gọi AI/ngày. Đây là hạn mức lượt gọi, không phải số dư tiền.", Toast.LENGTH_LONG).show());
+            }
+            // Save before network dispatch; failed attempts also count toward the anti-loop limit.
+            if (!editor.commit()) throw new IllegalStateException("Không lưu được bộ đếm API; tạm dừng để bảo vệ hạn mức.");
+            activeCall = true; RECENT_CALLS.addLast(now);
+            REQUEST_CONTEXT.set(context.getApplicationContext());
+        }
+    }
+
+    private static void release(boolean success) {
+        synchronized (SPEND_LOCK) {
+            activeCall = false;
+            if (success) failures = 0;
+            else if (++failures >= 3) { pausedUntil = SystemClock.elapsedRealtime() + 60000; failures = 0; }
+            REQUEST_CONTEXT.remove();
+            REQUEST_TICKET.remove();
+        }
+    }
+
+    private static void recordUsage(JSONObject response) {
+        Context context = REQUEST_CONTEXT.get();
+        JSONObject usage = response.optJSONObject("usage");
+        if (context == null || usage == null) return;
+        if (!(usage.has("prompt_tokens") || usage.has("input_tokens"))
+                || !(usage.has("completion_tokens") || usage.has("output_tokens"))) return;
+        synchronized (SPEND_LOCK) {
+            SharedPreferences prefs = usagePrefs(context);
+            long input = Math.max(0, usage.optLong("prompt_tokens", usage.optLong("input_tokens", 0)));
+            long output = Math.max(0, usage.optLong("completion_tokens", usage.optLong("output_tokens", 0)));
+            VndBudget.settle(context, REQUEST_TICKET.get(), input, output);
+            prefs.edit().putLong("input_tokens", prefs.getLong("input_tokens", 0) + input)
+                    .putLong("output_tokens", prefs.getLong("output_tokens", 0) + output)
+                    .putInt("metered", prefs.getInt("metered", 0) + 1).commit();
+        }
+    }
+
+    public static String usageSummary(Context context) {
+        SharedPreferences prefs = usagePrefs(context);
+        boolean current = today().equals(prefs.getString("day", ""));
+        int calls = current ? prefs.getInt("calls", 0) : 0;
+        int limit = dailyLimit(context);
+        int metered = current ? prefs.getInt("metered", 0) : 0;
+        return "Hôm nay: " + calls + "/" + limit + " lượt thử API; còn " + Math.max(0, limit - calls)
+                + ". Giới hạn " + minuteLimit(context) + "/phút."
+                + "\nToken nhà cung cấp báo: vào " + (current ? prefs.getLong("input_tokens", 0) : 0)
+                + ", ra " + (current ? prefs.getLong("output_tokens", 0) : 0) + " (" + metered + " phản hồi có usage)."
+                + "\nCâu cục bộ, cache và câu đã lưu không dùng lượt API. Lượt lỗi vẫn tính vào hạn mức."
+                + "\n" + VndBudget.summary(context)
+                + (calls * 5 >= limit * 4 ? "\n⚠ Còn tối đa 20% lượt gọi hôm nay." : "");
     }
 
     private static String readAll(InputStream stream) throws Exception {
