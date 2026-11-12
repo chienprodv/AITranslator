@@ -30,7 +30,7 @@ public final class TranslationEngine {
         final String provider = AppPrefs.provider(context);
         final String model = AppPrefs.model(context);
         final String ctx = AppPrefs.businessContext(context);
-        final String key = provider + "|" + AppPrefs.glossary(context) + "|" + AppPrefs.businessContext(context) + "|" + model + "|" + ctx + "|" + text;
+        final String key = provider + "|" + KeyboardData.styleKey(context) + "|" + AppPrefs.glossary(context) + "|" + AppPrefs.businessContext(context) + "|" + model + "|" + ctx + "|" + text;
 
         TranslationResult cached = CACHE.get(key);
         if (cached != null) {
@@ -53,7 +53,7 @@ public final class TranslationEngine {
 
         EXEC.execute(() -> {
             try {
-                TranslationResult r = ApiClient.translate(context, text);
+                TranslationResult r = MeaningCheck.check(ApiClient.translate(context, text), KeyboardData.prefs(context).getString("lock_terms", ""));
                 CACHE.put(key, r);
                 HistoryStore.add(context, "VI→中", r.source, r.chinese, r.backVi, r.score);
                 MAIN.post(() -> callback.onSuccess(r, false));
