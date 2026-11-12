@@ -22,6 +22,7 @@ public final class KeyboardSurface extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<Integer, Press> presses = new LinkedHashMap<>();
+    private final Map<String, Long> flashes = new HashMap<>();
     private KeyboardModel model = new KeyboardModel(0, false);
     private boolean shifted, caps, english, numeric, privateEditor;
     private int symbols, focused = -1;
@@ -40,7 +41,7 @@ public final class KeyboardSurface extends View {
         super(context); this.listener = listener;
         setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         setFocusable(false); setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
-        setContentDescription("Bàn phím Ngọc Thọ; giữ phím cách rồi kéo để di chuyển con trỏ");
+        setContentDescription("Bàn phím Xinayu; giữ phím cách rồi kéo để di chuyển con trỏ");
     }
     private android.content.SharedPreferences prefs() { return getContext().getSharedPreferences("keyboard_ui", Context.MODE_PRIVATE); }
     private float dp(float value) { return value * getResources().getDisplayMetrics().density; }
@@ -93,15 +94,36 @@ public final class KeyboardSurface extends View {
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         boolean dark = dark();
+        long now = android.os.SystemClock.uptimeMillis();
+        boolean led = prefs().getBoolean("rgb_press", true) && android.animation.ValueAnimator.areAnimatorsEnabled();
+        boolean colored = prefs().getBoolean("three_colors", true), animate = false;
+        flashes.entrySet().removeIf(entry -> KeyboardLighting.strength(entry.getValue(), now) == 0);
         canvas.drawColor(dark ? 0xff202124 : 0xffe4e5e7);
         float fontScale = Math.max(0.8f, Math.min(1.25f, prefs().getInt("key_font", 100) / 100f));
         for (KeyboardModel.Key key : model.keys) {
             boolean special = key.code.length() > 1 && !key.code.equals("SPACE");
             boolean pressed = false;
-            for (Press p : presses.values()) if (p.current == key) { pressed = true; break; }
-            paint.setColor(pressed ? (dark ? 0xff64748b : 0xffb9d5ff) : special ? (dark ? 0xff484b50 : 0xffc9ccd0) : dark ? 0xff35373c : 0xffffffff);
+            for (Press p : presses.values()) if (p.current != null && p.current.code.equals(key.code)) { pressed = true; break; }
+            float flash = led && flashes.containsKey(key.code) ? KeyboardLighting.strength(flashes.get(key.code), now) : 0;
+            animate |= flash > 0;
+            int light = KeyboardLighting.rgb(now, key.cx(), dark);
+            int background = pressed ? (dark ? 0xff64748b : 0xffb9d5ff) : special ? (dark ? 0xff484b50 : 0xffc9ccd0) : dark ? 0xff35373c : 0xffffffff;
+            paint.setColor(KeyboardLighting.blend(background, light, flash * 0.28f));
             paint.setShadowLayer(dp(1), 0, dp(1), 0x33000000); canvas.drawRoundRect(rect(key), dp(6), dp(6), paint); paint.clearShadowLayer();
-            paint.setColor(key.code.equals("ENTER") || key.code.equals("SHIFT") && shifted ? 0xff3b82f6 : dark ? 0xfff1f3f4 : 0xff15171a);
+            if (flash > 0) {
+                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(1.8f));
+                paint.setColor((Math.round(255 * flash) << 24) | (light & 0x00ffffff));
+                paint.setShadowLayer(dp(7) * flash, 0, 0, paint.getColor());
+                canvas.drawRoundRect(rect(key), dp(6), dp(6), paint);
+                paint.clearShadowLayer(); paint.setStyle(Paint.Style.FILL);
+            }
+            int zone = KeyboardLighting.zone(key.cx());
+            String[] zones = {"color_left", "color_middle", "color_right"};
+            String[] defaults = {"cyan", "purple", "pink"};
+            int textColor = colored ? KeyboardLighting.color(prefs().getString(zones[zone], defaults[zone]), dark)
+                    : key.code.equals("ENTER") || key.code.equals("SHIFT") && shifted ? 0xff3b82f6 : dark ? 0xfff1f3f4 : 0xff15171a;
+            paint.setColor(KeyboardLighting.blend(textColor, light, flash));
+            if (flash > 0) paint.setShadowLayer(dp(4) * flash, 0, 0, light);
             String text = label(key.code);
             paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
             float size = dp(key.code.equals("SPACE") ? 15 : text.length() > 2 ? 16 : 23) * fontScale;
@@ -110,6 +132,10 @@ public final class KeyboardSurface extends View {
             while (paint.measureText(text) > bounds.width() - dp(4) && size > dp(9)) paint.setTextSize(--size);
             paint.setTextAlign(Paint.Align.CENTER);
             canvas.drawText(text, bounds.centerX(), bounds.centerY() - (paint.ascent() + paint.descent()) / 2, paint);
+            paint.clearShadowLayer();
+            if (key.code.equals("SHIFT") && shifted) {
+                paint.setColor(textColor); canvas.drawRoundRect(bounds.centerX()-dp(8), bounds.bottom-dp(4), bounds.centerX()+dp(8), bounds.bottom-dp(2), dp(1), dp(1), paint);
+            }
         }
         if (prefs().getBoolean("swipe", false) && presses.size() == 1) {
             Press p = presses.values().iterator().next();
@@ -134,8 +160,13 @@ public final class KeyboardSurface extends View {
                 canvas.drawText(variants[i], variantBounds.left + cell * (i + 0.5f), variantBounds.centerY() - (paint.ascent() + paint.descent()) / 2, paint);
             }
         }
+        if (animate && isShown()) postInvalidateOnAnimation();
+    }
+    private void flash(String code) {
+        if (prefs().getBoolean("rgb_press", true)) flashes.put(code, android.os.SystemClock.uptimeMillis());
     }
     private void emit(String code) {
+        flash(code);
         if (prefs().getBoolean("haptic", true)) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         if (prefs().getBoolean("key_sound", false)) playSoundEffect(SoundEffectConstants.CLICK);
         listener.key(code); sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_CLICKED);
@@ -150,6 +181,7 @@ public final class KeyboardSurface extends View {
         KeyboardModel.Point point = point(event.getX(index), event.getY(index));
         KeyboardModel.Key key = model.hit(point.x, point.y);
         if (key == null) return;
+        flash(key.code);
         Press p = new Press(); p.id = event.getPointerId(index); p.start = point; p.initial = key; p.current = key; p.path.add(point);
         presses.put(p.id, p);
         p.hold = new Runnable() {
@@ -231,7 +263,7 @@ public final class KeyboardSurface extends View {
     }
     private void cancelPresses() { for (Press p : presses.values()) handler.removeCallbacks(p.hold); presses.clear(); variants = null; variantBounds = null; variantPointer = -1; invalidate(); }
     @Override public boolean performClick() { super.performClick(); return true; }
-    @Override protected void onDetachedFromWindow() { cancelPresses(); super.onDetachedFromWindow(); }
+    @Override protected void onDetachedFromWindow() { cancelPresses(); flashes.clear(); super.onDetachedFromWindow(); }
 
     @Override public AccessibilityNodeProvider getAccessibilityNodeProvider() {
         return new AccessibilityNodeProvider() {
