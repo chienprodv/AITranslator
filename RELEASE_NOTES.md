@@ -1,3 +1,7 @@
+# Release 1.2.0 — 12/11/2026
+
+Xem [tính năng, cách dùng và phạm vi kiểm tra](docs/KEYBOARD_1.2.md).
+
 # Release Notes — 1.0.0
 
 ## Mục tiêu
