@@ -1,3 +1,9 @@
+# Release 1.2.1 — XinayuAITranslator
+
+Copyright by Nguyen xuan chien
+
+Khoảng trống dưới bàn phím, màu ký tự ba vùng, RGB khi chạm, đổi tên app và quy trình giữ khóa ký. Xem [cài đặt và giới hạn chữ ký cũ](docs/KEYBOARD_1.2.1.md).
+
 # Release 1.2.0 — 12/11/2026
 
 Xem [tính năng, cách dùng và phạm vi kiểm tra](docs/KEYBOARD_1.2.md).
