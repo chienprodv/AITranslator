@@ -1,8 +1,8 @@
-# XinayuAITranslator 1.4.1
+# XinayuAITranslator 1.4.2
 
 Copyright by Nguyen xuan chien
 
-Bản hiện tại có Studio LED, dịch đè theo bố cục ảnh chụp và emoji; xem [sửa lỗi 1.4.1](docs/FIX_1.4.1.md), [hướng dẫn màn hình/emoji](docs/SCREEN_EMOJI_1.4.md) và [hướng dẫn LED](docs/LED_1.3.md). Bản đã ký dùng cùng khóa 1.2.1 để cài đè. Xem [quy trình ký bằng khóa cố định](docs/SIGNING.md).
+Bản hiện tại có Studio LED, dịch đè theo bố cục ảnh chụp và emoji; xem [LED và cuộn mượt hơn 1.4.2](docs/PERFORMANCE_1.4.2.md), [sửa lỗi Enter/nút nổi](docs/FIX_1.4.1.md), [hướng dẫn màn hình/emoji](docs/SCREEN_EMOJI_1.4.md) và [hướng dẫn LED](docs/LED_1.3.md). Bản đã ký dùng cùng khóa 1.2.1 để cài đè. Xem [quy trình ký bằng khóa cố định](docs/SIGNING.md).
 
 Từ 12/11/2026, chủ sở hữu đã hủy kế hoạch đăng Google Play. Các lần build tiếp theo chỉ tạo APK; không build AAB hoặc tiếp tục chuẩn bị hồ sơ CH Play. Các tài liệu/gói Play cũ chỉ là lịch sử, không phải công việc còn phải hoàn thành.
 
