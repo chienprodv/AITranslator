@@ -72,8 +72,11 @@ public class MainActivity extends Activity {
         scroll.addView(root);
 
         root.addView(text("Ngọc Thọ AI Translator", 25, true));
+        Button keyboardSettings = button("BÀN PHÍM: BỐ CỤC, CÂU MẪU, RIÊNG TƯ, SAO LƯU");
+        keyboardSettings.setOnClickListener(v -> startActivity(new Intent(this, KeyboardOptionsActivity.class)));
+        root.addView(keyboardSettings);
         root.addView(text(
-                "Bản 1.1 — câu đã lưu, ký hiệu, emoji, micro ngay trên bàn phím Việt→Trung, dịch ngược bắt buộc, chọn vùng màn hình để OCR, dịch giọng nói hai chiều, cache/từ điển cục bộ và chế độ proxy an toàn.",
+                "Bản 1.2 — câu đã lưu, ký hiệu, emoji, micro ngay trên bàn phím Việt→Trung, dịch ngược bắt buộc, chọn vùng màn hình để OCR, dịch giọng nói hai chiều, cache/từ điển cục bộ và chế độ proxy an toàn.",
                 14, false));
 
         addSpacer(root, 16);
