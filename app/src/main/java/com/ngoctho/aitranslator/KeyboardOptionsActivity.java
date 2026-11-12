@@ -20,14 +20,20 @@ public class KeyboardOptionsActivity extends Activity {
     private CheckBox includeClipboard;
     private int sampleSymbols;
     private boolean sampleShift;
+    private boolean resumed;
+    private final android.os.Handler previewHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Rect previewVisible=new Rect();
+    private final Runnable resumePreview=()->{if(preview!=null)preview.animationActive(resumed&&preview.getGlobalVisibleRect(previewVisible));};
+    private void scrollBusy(){if(preview!=null)preview.animationActive(false);previewHandler.removeCallbacks(resumePreview);previewHandler.postDelayed(resumePreview,180);}
+
     private android.content.SharedPreferences prefs() { return KeyboardData.prefs(this); }
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state);
+        super.onCreate(state);HighRefresh.request(getWindow());
         ScrollView scroll = new ScrollView(this); root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(24)); scroll.addView(root); UiInsets.apply(scroll); setContentView(scroll);
-        title("XinayuAITranslator 1.3.0");
+        title("XinayuAITranslator 1.4.2");
         text("Copyright by Nguyen xuan chien");
-        text("Bố cục theo ảnh Samsung đã cung cấp. Chạm vào bản xem trước để thử vùng phím. Thay đổi áp dụng khi mở lại bàn phím.");
+        text("Bố cục theo ảnh Samsung đã cung cấp. Chạm vào bản xem trước để thử vùng phím. LED xem trước tạm dừng khi cuộn để giữ giao diện mượt. Thay đổi áp dụng khi mở lại bàn phím.");
         previewText = text("Xem trước phím vừa bấm: —");
         preview = new KeyboardSurface(this, new KeyboardSurface.Listener() {
             public void key(String code) {
@@ -40,7 +46,9 @@ public class KeyboardOptionsActivity extends Activity {
             public void gesture(java.util.List<KeyboardModel.Point> points) { previewText.setText("Gõ vuốt: " + WordTools.swipe(points, KeyboardData.learned(KeyboardOptionsActivity.this))); }
             public void longKey(String code) { previewText.setText("Giữ: " + code); }
         });
-        root.addView(preview); refreshPreview();
+        root.addView(preview);preview.animationActive(false);refreshPreview();
+        scroll.getViewTreeObserver().addOnScrollChangedListener(this::scrollBusy);
+        scroll.setOnTouchListener((v,event)->{if(event.getActionMasked()==MotionEvent.ACTION_DOWN||event.getActionMasked()==MotionEvent.ACTION_MOVE)scrollBusy();return false;});
         slider("Chiều cao hàng phím", "key_height", 38, 62, 48);
         slider("Cỡ chữ (%)", "key_font", 80, 125, 100);
         slider("Khoảng trống thêm phía dưới (dp)", "bottom_gap", 12, 72, 28);
@@ -119,7 +127,9 @@ public class KeyboardOptionsActivity extends Activity {
         button("LÀM MỚI THỐNG KÊ", () -> recreate());
         button("QUAY LẠI", this::finish);
     }
-    @Override protected void onResume() { super.onResume(); if (usage != null) usage.setText(ApiClient.usageSummary(this)); }
+    @Override protected void onResume(){super.onResume();resumed=true;HighRefresh.request(getWindow());previewHandler.post(resumePreview);if(usage!=null)usage.setText(ApiClient.usageSummary(this));}
+    @Override protected void onPause(){resumed=false;previewHandler.removeCallbacks(resumePreview);if(preview!=null)preview.animationActive(false);super.onPause();}
+    @Override protected void onDestroy(){previewHandler.removeCallbacksAndMessages(null);super.onDestroy();}
     private void refreshPreview() { if (preview != null) preview.state(sampleSymbols, sampleShift, false, false, false, false); }
     private void title(String value) { TextView view = text(value); view.setTextSize(21); view.setTypeface(null, Typeface.BOLD); view.setPadding(0, dp(16), 0, dp(6)); }
     private TextView text(String value) { TextView view = new TextView(this); view.setText(value); view.setTextSize(14); view.setPadding(0, dp(4), 0, dp(4)); root.addView(view); return view; }
