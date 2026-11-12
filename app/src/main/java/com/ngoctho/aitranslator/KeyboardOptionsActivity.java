@@ -112,7 +112,7 @@ public class KeyboardOptionsActivity extends Activity {
         for (int i = 0; i < Math.min(14, records.length()); i++) {
             JSONObject item = records.optJSONObject(i); if (item == null) continue;
             breakdown.append(item.optString("day")).append(": bàn phím ").append((item.optInt("vi_zh") + item.optInt("keyboard_reverse")))
-                    .append(", giọng nói ").append(item.optInt("voice")).append(", màn hình ").append(item.optInt("screen_zh_vi"))
+                    .append(", giọng nói ").append(item.optInt("voice")).append(", màn hình ").append(item.optInt("screen_zh_vi")+item.optInt("screen_layout_zh_vi"))
                     .append(" · token ").append(item.optLong("input") + item.optLong("output")).append('\n');
         }
         text(breakdown.length() == 0 ? "Chưa có dữ liệu API mới để vẽ biểu đồ." : breakdown.toString());
