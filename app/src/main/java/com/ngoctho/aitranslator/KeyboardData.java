@@ -95,7 +95,7 @@ public final class KeyboardData {
             "english", "theme", "one_hand", "key_height", "key_font", "haptic", "key_sound", "suggestions", "autocorrect",
             "swipe", "learn_words", "learned_words", "templates", "clip_ttl_hours", "history_ttl_days", "auto_favorite", "voice_review", "tone", "lock_terms",
             "bottom_gap", "three_colors", "color_left", "color_middle", "color_right", "rgb_press",
-            "led_mode", "led_brightness", "led_speed", "led_reverse", "led_color"));
+            "led_mode", "led_brightness", "led_speed", "led_reverse", "led_color", "favorite_emoji_v2"));
     private static final Set<String> APP_KEYS = new HashSet<>(Arrays.asList("provider", "model_deepseek", "model_openai", "business_context",
             "glossary", "auto_translate", "auto_delay_ms", "save_history"));
     private static JSONObject copy(SharedPreferences prefs, Set<String> keys) throws Exception {
