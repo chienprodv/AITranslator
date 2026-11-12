@@ -25,6 +25,9 @@ public final class DirectionalTranslationEngine {
     private DirectionalTranslationEngine() {}
 
     public static void translate(Context context, String source, String direction, Callback callback) {
+        translate(context, source, direction, false, callback);
+    }
+    public static void translate(Context context, String source, String direction, boolean typed, Callback callback) {
         final String text = source == null ? "" : source.trim();
         if (text.isEmpty()) {
             callback.onError("Chưa có nội dung để dịch.");
@@ -34,7 +37,7 @@ public final class DirectionalTranslationEngine {
         final String provider = AppPrefs.provider(context);
         final String model = AppPrefs.model(context);
         final String ctx = AppPrefs.businessContext(context);
-        final String key = provider + "|" + AppPrefs.glossary(context) + "|" + AppPrefs.businessContext(context) + "|" + model + "|" + ctx + "|" + dir + "|" + text;
+        final String key = provider + "|" + KeyboardData.styleKey(context) + "|" + AppPrefs.glossary(context) + "|" + AppPrefs.businessContext(context) + "|" + model + "|" + ctx + "|" + dir + "|" + typed + "|" + text;
 
         BiTranslationResult cached = CACHE.get(key);
         if (cached != null) {
@@ -58,7 +61,7 @@ public final class DirectionalTranslationEngine {
 
         EXEC.execute(() -> {
             try {
-                BiTranslationResult r = ApiClient.translateDirectional(context, text, dir);
+                BiTranslationResult r = ApiClient.translateDirectional(context, text, dir, typed);
                 CACHE.put(key, r);
                 HistoryStore.add(context, dir.equals(VI_TO_ZH) ? "VOICE VI→中" : "VOICE 中→VI",
                         r.source, r.translated, r.backTranslated, r.score);
