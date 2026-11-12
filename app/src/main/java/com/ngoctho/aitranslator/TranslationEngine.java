@@ -38,11 +38,16 @@ public final class TranslationEngine {
             return;
         }
 
-        TranslationResult local = LocalPhrasebook.translateViToZh(text, ctx);
+        boolean useLocal = "polite".equals(KeyboardData.prefs(context).getString("tone", "polite"))
+                && KeyboardData.prefs(context).getString("lock_terms", "").isEmpty()
+                && !text.equals(KeyboardData.prefs(context).getString("alternative_source", ""));
+        TranslationResult local = useLocal ? LocalPhrasebook.translateViToZh(text, ctx) : null;
+        if (local != null) local = MeaningCheck.check(local, "");
         if (local != null) {
-            CACHE.put(key, local);
-            HistoryStore.add(context, "VI→中 · local", local.source, local.chinese, local.backVi, local.score);
-            MAIN.post(() -> callback.onSuccess(local, true));
+            final TranslationResult result = local;
+            CACHE.put(key, result);
+            HistoryStore.add(context, "VI→中 · local", result.source, result.chinese, result.backVi, result.score);
+            MAIN.post(() -> callback.onSuccess(result, true));
             return;
         }
 
