@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
         keyboardSettings.setOnClickListener(v -> startActivity(new Intent(this, KeyboardOptionsActivity.class)));
         root.addView(keyboardSettings);
         root.addView(text(
-                "Bản 1.4.0 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
+                "Bản 1.4.1 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
                 14, false));
 
         addSpacer(root, 16);
@@ -337,7 +337,8 @@ public class MainActivity extends Activity {
         if(!PrivacyConsent.allowed(this)){PrivacyConsent.show(this);return;}
         MediaProjectionManager manager =
                 (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
-        startActivityForResult(manager.createScreenCaptureIntent(), REQ_SCREEN_CAPTURE);
+        Intent capture=Build.VERSION.SDK_INT>=34?manager.createScreenCaptureIntent(android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay()):manager.createScreenCaptureIntent();
+        startActivityForResult(capture, REQ_SCREEN_CAPTURE);
     }
 
     @Override
@@ -366,7 +367,7 @@ public class MainActivity extends Activity {
         if (!Settings.canDrawOverlays(this)) {
             screenStatus.setText("Trạng thái: chưa cấp quyền bong bóng.");
         } else if (ScreenTranslateService.running) {
-            screenStatus.setText("Trạng thái: dịch màn hình đang chạy.");
+            screenStatus.setText("Trạng thái: "+ScreenTranslateService.lastStatus);
         } else {
             screenStatus.setText("Trạng thái: đã có quyền bong bóng, dịch màn hình chưa chạy.");
         }
