@@ -100,7 +100,7 @@ public final class KeyboardLighting {
     }
     public static int blend(int base, int light, float fraction) {
         float f = Math.max(0, Math.min(1, fraction)); int result = 0xff000000;
-        for (int shift : new int[]{0,8,16}) {
+        for(int shift=0;shift<=16;shift+=8){
             int a = (base >> shift) & 255, b = (light >> shift) & 255;
             result |= Math.round(a + (b - a) * f) << shift;
         }
