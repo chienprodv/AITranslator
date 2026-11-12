@@ -1,3 +1,7 @@
+# Release 1.3.0 — Studio LED
+
+16 hiệu ứng + Tắt; điều chỉnh trực tiếp trên bàn phím, độ sáng/tốc độ/đảo chiều; thông báo và đồng ý gửi dữ liệu trực tuyến, quyền riêng tư và bản AAB chuẩn bị Google Play. Chưa phát hành Google Play vì chưa có tài khoản Console và chưa thử nghiệm kín.
+
 # Release 1.2.1 — XinayuAITranslator
 
 Copyright by Nguyen xuan chien
