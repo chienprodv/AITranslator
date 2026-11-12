@@ -71,12 +71,13 @@ public class MainActivity extends Activity {
         root.setPadding(dp(18), dp(16), dp(18), dp(40));
         scroll.addView(root);
 
-        root.addView(text("Ngọc Thọ AI Translator", 25, true));
+        root.addView(text("XinayuAITranslator", 25, true));
+        root.addView(text("Copyright by Nguyen xuan chien", 13, false));
         Button keyboardSettings = button("BÀN PHÍM: BỐ CỤC, CÂU MẪU, RIÊNG TƯ, SAO LƯU");
         keyboardSettings.setOnClickListener(v -> startActivity(new Intent(this, KeyboardOptionsActivity.class)));
         root.addView(keyboardSettings);
         root.addView(text(
-                "Bản 1.2 — câu đã lưu, ký hiệu, emoji, micro ngay trên bàn phím Việt→Trung, dịch ngược bắt buộc, chọn vùng màn hình để OCR, dịch giọng nói hai chiều, cache/từ điển cục bộ và chế độ proxy an toàn.",
+                "Bản 1.2.1 — màu ký tự 3 vùng, RGB khi bấm phím, khoảng trống dưới bàn phím có thể chỉnh, câu đã lưu, ký hiệu, emoji, micro, dịch hai chiều và hạn mức VNĐ.",
                 14, false));
 
         addSpacer(root, 16);
@@ -219,7 +220,7 @@ public class MainActivity extends Activity {
         enable.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)));
         root.addView(enable);
 
-        Button pick = button("CHỌN NGỌC THỌ AI KEYBOARD");
+        Button pick = button("CHỌN BÀN PHÍM XINAYU");
         pick.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             imm.showInputMethodPicker();
