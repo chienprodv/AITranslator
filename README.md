@@ -1,6 +1,10 @@
-# Ngọc Thọ AI Translator 1.2.0
+# XinayuAITranslator 1.2.1
 
-Bản 1.2.0: sửa vùng chạm và Telex; bổ sung tùy chỉnh bàn phím, gợi ý/vuốt, câu mẫu, clipboard, dịch hai chiều, thống kê và sao lưu. Xem [hướng dẫn bàn phím 1.2](docs/KEYBOARD_1.2.md).
+Copyright by Nguyen xuan chien
+
+Bản 1.2.1: tăng khoảng trống dưới bàn phím, ký tự ba màu và RGB khi chạm. Xem [hướng dẫn bản fix và cài đặt](docs/KEYBOARD_1.2.1.md), [quy trình ký bằng khóa cố định](docs/SIGNING.md).
+
+CI hiện tạo APK unsigned; APK cài đặt cần ký bằng khóa riêng đã giữ trên máy. Chữ ký mới từ 1.2.1 không cài đè bản debug 1.2.0 đã mất khóa riêng.
 
 Ứng dụng Android dịch Việt ↔ Trung tập trung vào **tốc độ + kiểm tra sát nghĩa bằng dịch ngược**.
 
