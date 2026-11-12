@@ -10,6 +10,10 @@ import java.util.*;
 public final class KeyboardData {
     private KeyboardData() {}
     public static SharedPreferences prefs(Context context) { return context.getSharedPreferences("keyboard_ui", Context.MODE_PRIVATE); }
+    public static String ledMode(Context context) {
+        SharedPreferences p=prefs(context);
+        return KeyboardLighting.mode(p.getString("led_mode",p.getBoolean("rgb_press",true)?"wave":"off"));
+    }
     public static List<String> learned(Context context) {
         String data = prefs(context).getString("learned_words", "");
         return data == null || data.isEmpty() ? new ArrayList<>() : new ArrayList<>(Arrays.asList(data.split("\n")));
@@ -90,7 +94,8 @@ public final class KeyboardData {
     private static final Set<String> UI_KEYS = new HashSet<>(Arrays.asList(
             "english", "theme", "one_hand", "key_height", "key_font", "haptic", "key_sound", "suggestions", "autocorrect",
             "swipe", "learn_words", "learned_words", "templates", "clip_ttl_hours", "history_ttl_days", "auto_favorite", "voice_review", "tone", "lock_terms",
-            "bottom_gap", "three_colors", "color_left", "color_middle", "color_right", "rgb_press"));
+            "bottom_gap", "three_colors", "color_left", "color_middle", "color_right", "rgb_press",
+            "led_mode", "led_brightness", "led_speed", "led_reverse", "led_color"));
     private static final Set<String> APP_KEYS = new HashSet<>(Arrays.asList("provider", "model_deepseek", "model_openai", "business_context",
             "glossary", "auto_translate", "auto_delay_ms", "save_history"));
     private static JSONObject copy(SharedPreferences prefs, Set<String> keys) throws Exception {
@@ -111,8 +116,8 @@ public final class KeyboardData {
         for (String key : allowed) {
             if (!data.has(key)) continue;
             Object value = data.get(key);
-            boolean booleanKey = key.matches("english|haptic|key_sound|suggestions|autocorrect|swipe|learn_words|auto_favorite|voice_review|auto_translate|save_history|three_colors|rgb_press");
-            boolean numericKey = key.matches("key_height|key_font|clip_ttl_hours|history_ttl_days|auto_delay_ms|bottom_gap");
+            boolean booleanKey = key.matches("english|haptic|key_sound|suggestions|autocorrect|swipe|learn_words|auto_favorite|voice_review|auto_translate|save_history|three_colors|rgb_press|led_reverse");
+            boolean numericKey = key.matches("key_height|key_font|clip_ttl_hours|history_ttl_days|auto_delay_ms|bottom_gap|led_brightness|led_speed");
             if (value instanceof Boolean && booleanKey) editor.putBoolean(key, (Boolean) value);
             else if (value instanceof Number && numericKey) {
                 int n = ((Number) value).intValue();
@@ -120,9 +125,12 @@ public final class KeyboardData {
                 else if (key.equals("key_font")) n = Math.max(80, Math.min(125, n));
                 else if (key.equals("auto_delay_ms")) n = Math.max(350, Math.min(1800, n));
                 else if (key.equals("bottom_gap")) n = KeyboardLighting.bottomGap(n);
+                else if (key.equals("led_brightness")) n = KeyboardLighting.brightness(n);
+                else if (key.equals("led_speed")) n = KeyboardLighting.speed(n);
                 else n = Math.max(1, Math.min(365, n));
                 editor.putInt(key, n);
-            } else if (value instanceof String && !booleanKey && !numericKey && ((String) value).length() <= 100000) editor.putString(key, (String) value);
+            } else if (value instanceof String && !booleanKey && !numericKey && ((String) value).length() <= 100000)
+                editor.putString(key,key.equals("led_mode")?KeyboardLighting.mode((String)value):(String)value);
         }
         if (!editor.commit()) throw new IllegalStateException("Không lưu được cấu hình khôi phục.");
     }
