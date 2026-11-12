@@ -189,6 +189,7 @@ public class VoiceTranslateActivity extends Activity {
     }
 
     private void startListening(String direction) {
+        if(!PrivacyConsent.allowed(this)){PrivacyConsent.show(this);return;}
         pendingDirection = direction;
 
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
