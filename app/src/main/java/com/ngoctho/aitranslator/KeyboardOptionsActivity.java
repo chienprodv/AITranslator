@@ -25,7 +25,8 @@ public class KeyboardOptionsActivity extends Activity {
         super.onCreate(state);
         ScrollView scroll = new ScrollView(this); root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(24)); scroll.addView(root); UiInsets.apply(scroll); setContentView(scroll);
-        title("Bàn phím Ngọc Thọ 1.2");
+        title("XinayuAITranslator 1.2.1");
+        text("Copyright by Nguyen xuan chien");
         text("Bố cục theo ảnh Samsung đã cung cấp. Chạm vào bản xem trước để thử vùng phím. Thay đổi áp dụng khi mở lại bàn phím.");
         previewText = text("Xem trước phím vừa bấm: —");
         preview = new KeyboardSurface(this, new KeyboardSurface.Listener() {
@@ -42,6 +43,16 @@ public class KeyboardOptionsActivity extends Activity {
         root.addView(preview); refreshPreview();
         slider("Chiều cao hàng phím", "key_height", 38, 62, 48);
         slider("Cỡ chữ (%)", "key_font", 80, 125, 100);
+        slider("Khoảng trống thêm phía dưới (dp)", "bottom_gap", 12, 72, 28);
+        text("Khoảng trống này cộng thêm phía trên vùng điều hướng/nút đổi bàn phím hệ thống để tránh chạm nhầm. Mở lại bàn phím để áp dụng.");
+        check("Màu ký tự chia 3 vùng trái – giữa – phải", "three_colors", true);
+        String[] colorNames = {"Xanh ngọc", "Tím", "Hồng", "Vàng", "Xanh lá", "Xanh dương"};
+        String[] colorValues = {"cyan", "purple", "pink", "amber", "green", "blue"};
+        choice("Màu ký tự vùng trái", "color_left", colorNames, colorValues, "cyan");
+        choice("Màu ký tự vùng giữa", "color_middle", colorNames, colorValues, "purple");
+        choice("Màu ký tự vùng phải", "color_right", colorNames, colorValues, "pink");
+        check("Sáng RGB trên phím khi chạm", "rgb_press", true);
+        text("RGB đổi màu và tắt dần sau 0,6 giây, không chạy khi bàn phím đứng yên. Hiệu ứng tôn trọng cài đặt tắt hoạt ảnh của Android.");
         choice("Giao diện", "theme", new String[]{"Theo hệ thống", "Sáng", "Tối"}, new String[]{"system", "light", "dark"}, "system");
         choice("Chế độ một tay", "one_hand", new String[]{"Bình thường", "Tay trái", "Tay phải"}, new String[]{"off", "left", "right"}, "off");
         check("Rung khi bấm phím", "haptic", true); check("Âm thanh phím", "key_sound", false);
@@ -143,7 +154,7 @@ public class KeyboardOptionsActivity extends Activity {
     private void chooseDocument(boolean save) {
         Intent request = new Intent(save ? Intent.ACTION_CREATE_DOCUMENT : Intent.ACTION_OPEN_DOCUMENT);
         request.addCategory(Intent.CATEGORY_OPENABLE); request.setType("application/json");
-        if (save) request.putExtra(Intent.EXTRA_TITLE, "NgocTho-keyboard-backup.json");
+        if (save) request.putExtra(Intent.EXTRA_TITLE, "XinayuAITranslator-keyboard-backup.json");
         try { startActivityForResult(request, save ? 801 : 802); } catch (Exception e) { toast("Máy chưa có trình chọn tệp."); }
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
