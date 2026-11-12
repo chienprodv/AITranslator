@@ -23,6 +23,10 @@ public final class KeyboardSurface extends View {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<Integer, Press> presses = new LinkedHashMap<>();
     private final Map<String, Long> flashes = new HashMap<>();
+    private final List<KeyboardLighting.Pulse> pulses = new ArrayList<>();
+    private final KeyboardLighting.Sample lighting = new KeyboardLighting.Sample();
+    private final Runnable ledFrame = this::invalidate;
+    private boolean effectsPaused;
     private KeyboardModel model = new KeyboardModel(0, false);
     private boolean shifted, caps, english, numeric, privateEditor;
     private int symbols, focused = -1;
@@ -48,6 +52,7 @@ public final class KeyboardSurface extends View {
     public void state(int symbols, boolean shifted, boolean caps, boolean english, boolean numeric, boolean privateEditor) {
         this.symbols = symbols; this.shifted = shifted; this.caps = caps; this.english = english;
         this.numeric = numeric; this.privateEditor = privateEditor;
+        effectsPaused = false;
         model = new KeyboardModel(symbols, numeric && symbols == 0); requestLayout(); invalidate();
     }
     public void setCase(boolean shifted, boolean caps) { this.shifted = shifted; this.caps = caps; invalidate(); }
@@ -95,35 +100,44 @@ public final class KeyboardSurface extends View {
         super.onDraw(canvas);
         boolean dark = dark();
         long now = android.os.SystemClock.uptimeMillis();
-        boolean led = prefs().getBoolean("rgb_press", true) && android.animation.ValueAnimator.areAnimatorsEnabled();
-        boolean colored = prefs().getBoolean("three_colors", true), animate = false;
+        boolean animations = android.animation.ValueAnimator.areAnimatorsEnabled();
+        String mode = KeyboardData.ledMode(getContext());
+        if (!animations && !mode.equals("off")) mode = "three_zone";
+        int brightness = KeyboardLighting.brightness(prefs().getInt("led_brightness",70));
+        int speed = KeyboardLighting.speed(prefs().getInt("led_speed",3));
+        boolean reverse = prefs().getBoolean("led_reverse",false);
+        boolean colored = prefs().getBoolean("three_colors", true);
+        boolean animate = animations && brightness>0 && (KeyboardLighting.continuous(mode)
+                || ((mode.equals("reactive") || mode.equals("ripple")) && !pulses.isEmpty()));
+        int[] zones = {KeyboardLighting.color(prefs().getString("color_left","cyan"),dark),
+                KeyboardLighting.color(prefs().getString("color_middle","purple"),dark),KeyboardLighting.color(prefs().getString("color_right","pink"),dark)};
+        int solid = KeyboardLighting.color(prefs().getString("led_color","cyan"),dark);
         flashes.entrySet().removeIf(entry -> KeyboardLighting.strength(entry.getValue(), now) == 0);
+        pulses.removeIf(pulse -> now-pulse.time > 3600);
         canvas.drawColor(dark ? 0xff202124 : 0xffe4e5e7);
         float fontScale = Math.max(0.8f, Math.min(1.25f, prefs().getInt("key_font", 100) / 100f));
         for (KeyboardModel.Key key : model.keys) {
             boolean special = key.code.length() > 1 && !key.code.equals("SPACE");
             boolean pressed = false;
             for (Press p : presses.values()) if (p.current != null && p.current.code.equals(key.code)) { pressed = true; break; }
-            float flash = led && flashes.containsKey(key.code) ? KeyboardLighting.strength(flashes.get(key.code), now) : 0;
-            animate |= flash > 0;
-            int light = KeyboardLighting.rgb(now, key.cx(), dark);
+            KeyboardLighting.sample(lighting,mode,now,key.cx(),key.cy(),dark,brightness,speed,reverse,solid,zones,pulses);
+            float flash = lighting.level;
+            int light = lighting.color;
             int background = pressed ? (dark ? 0xff64748b : 0xffb9d5ff) : special ? (dark ? 0xff484b50 : 0xffc9ccd0) : dark ? 0xff35373c : 0xffffffff;
-            paint.setColor(KeyboardLighting.blend(background, light, flash * 0.28f));
+            paint.setColor(KeyboardLighting.blend(background, light, flash * (dark ? 0.18f : 0.09f)));
             paint.setShadowLayer(dp(1), 0, dp(1), 0x33000000); canvas.drawRoundRect(rect(key), dp(6), dp(6), paint); paint.clearShadowLayer();
             if (flash > 0) {
-                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(1.8f));
+                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(1.4f));
                 paint.setColor((Math.round(255 * flash) << 24) | (light & 0x00ffffff));
-                paint.setShadowLayer(dp(7) * flash, 0, 0, paint.getColor());
+                paint.setShadowLayer(dp(4) * flash, 0, 0, paint.getColor());
                 canvas.drawRoundRect(rect(key), dp(6), dp(6), paint);
                 paint.clearShadowLayer(); paint.setStyle(Paint.Style.FILL);
             }
             int zone = KeyboardLighting.zone(key.cx());
-            String[] zones = {"color_left", "color_middle", "color_right"};
-            String[] defaults = {"cyan", "purple", "pink"};
-            int textColor = colored ? KeyboardLighting.color(prefs().getString(zones[zone], defaults[zone]), dark)
+            int textColor = colored ? zones[zone]
                     : key.code.equals("ENTER") || key.code.equals("SHIFT") && shifted ? 0xff3b82f6 : dark ? 0xfff1f3f4 : 0xff15171a;
-            paint.setColor(KeyboardLighting.blend(textColor, light, flash));
-            if (flash > 0) paint.setShadowLayer(dp(4) * flash, 0, 0, light);
+            paint.setColor(KeyboardLighting.blend(textColor, light, flash * 0.9f));
+            if (flash > 0) paint.setShadowLayer(dp(2) * flash, 0, 0, light);
             String text = label(key.code);
             paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
             float size = dp(key.code.equals("SPACE") ? 15 : text.length() > 2 ? 16 : 23) * fontScale;
@@ -160,10 +174,23 @@ public final class KeyboardSurface extends View {
                 canvas.drawText(variants[i], variantBounds.left + cell * (i + 0.5f), variantBounds.centerY() - (paint.ascent() + paint.descent()) / 2, paint);
             }
         }
-        if (animate && isShown()) postInvalidateOnAnimation();
+        handler.removeCallbacks(ledFrame);
+        if (animate && !effectsPaused && isAttachedToWindow() && isShown() && getWindowVisibility()==VISIBLE) handler.postDelayed(ledFrame,33);
     }
     private void flash(String code) {
-        if (prefs().getBoolean("rgb_press", true)) flashes.put(code, android.os.SystemClock.uptimeMillis());
+        long now=android.os.SystemClock.uptimeMillis();
+        if (flashes.containsKey(code) && now-flashes.get(code)<100) return;
+        flashes.put(code,now);
+        for(KeyboardModel.Key key:model.keys) if(key.code.equals(code)) {
+            if(pulses.size()==12)pulses.remove(0);
+            pulses.add(new KeyboardLighting.Pulse(key.cx(),key.cy(),now));break;
+        }
+    }
+    public void pauseEffects() { effectsPaused=true;handler.removeCallbacks(ledFrame); }
+    @Override protected void onAttachedToWindow() {super.onAttachedToWindow();effectsPaused=false;invalidate();}
+    @Override protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        if(handler!=null && ledFrame!=null) {handler.removeCallbacks(ledFrame);if(visibility==VISIBLE)invalidate();}
     }
     private void emit(String code) {
         flash(code);
@@ -263,7 +290,7 @@ public final class KeyboardSurface extends View {
     }
     private void cancelPresses() { for (Press p : presses.values()) handler.removeCallbacks(p.hold); presses.clear(); variants = null; variantBounds = null; variantPointer = -1; invalidate(); }
     @Override public boolean performClick() { super.performClick(); return true; }
-    @Override protected void onDetachedFromWindow() { cancelPresses(); flashes.clear(); super.onDetachedFromWindow(); }
+    @Override protected void onDetachedFromWindow() { pauseEffects();cancelPresses();flashes.clear();pulses.clear();super.onDetachedFromWindow(); }
 
     @Override public AccessibilityNodeProvider getAccessibilityNodeProvider() {
         return new AccessibilityNodeProvider() {
