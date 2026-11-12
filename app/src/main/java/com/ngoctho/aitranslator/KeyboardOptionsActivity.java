@@ -25,7 +25,7 @@ public class KeyboardOptionsActivity extends Activity {
         super.onCreate(state);
         ScrollView scroll = new ScrollView(this); root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(24)); scroll.addView(root); UiInsets.apply(scroll); setContentView(scroll);
-        title("XinayuAITranslator 1.2.1");
+        title("XinayuAITranslator 1.3.0");
         text("Copyright by Nguyen xuan chien");
         text("Bố cục theo ảnh Samsung đã cung cấp. Chạm vào bản xem trước để thử vùng phím. Thay đổi áp dụng khi mở lại bàn phím.");
         previewText = text("Xem trước phím vừa bấm: —");
@@ -51,8 +51,13 @@ public class KeyboardOptionsActivity extends Activity {
         choice("Màu ký tự vùng trái", "color_left", colorNames, colorValues, "cyan");
         choice("Màu ký tự vùng giữa", "color_middle", colorNames, colorValues, "purple");
         choice("Màu ký tự vùng phải", "color_right", colorNames, colorValues, "pink");
-        check("Sáng RGB trên phím khi chạm", "rgb_press", true);
-        text("RGB đổi màu và tắt dần sau 0,6 giây, không chạy khi bàn phím đứng yên. Hiệu ứng tôn trọng cài đặt tắt hoạt ảnh của Android.");
+        title("Studio LED");
+        choice("Hiệu ứng LED", "led_mode",KeyboardLighting.NAMES,KeyboardLighting.MODES,KeyboardData.ledMode(this));
+        slider("Độ sáng LED (%)", "led_brightness",0,100,70);
+        slider("Tốc độ LED (1 chậm – 5 nhanh)","led_speed",1,5,3);
+        check("Đảo chiều hiệu ứng chuyển động", "led_reverse",false);
+        choice("Màu cho Sáng một màu / Nhịp thở", "led_color",colorNames,colorValues,"cyan");
+        text("Sóng, thác, cực quang… chạy liên tục khi bàn phím hiện. Chạm sáng và Gợn sóng phản hồi vị trí gõ. Nền tối cho viền LED rõ hơn. Tắt LED hoặc đặt sáng 0% để giữ màu ký tự cơ bản. Hoạt ảnh dừng khi ẩn bàn phím và tôn trọng cài đặt hoạt ảnh Android.");
         choice("Giao diện", "theme", new String[]{"Theo hệ thống", "Sáng", "Tối"}, new String[]{"system", "light", "dark"}, "system");
         choice("Chế độ một tay", "one_hand", new String[]{"Bình thường", "Tay trái", "Tay phải"}, new String[]{"off", "left", "right"}, "off");
         check("Rung khi bấm phím", "haptic", true); check("Âm thanh phím", "key_sound", false);
