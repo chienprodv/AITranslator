@@ -42,6 +42,7 @@ public class ScreenTranslateService extends Service {
     public static final String EXTRA_RESULT_CODE = "result_code";
     public static final String EXTRA_RESULT_DATA = "result_data";
     public static volatile boolean running = false;
+    public static volatile String lastStatus="Chưa bật";
 
     private static final String CHANNEL_ID = "screen_translate";
     private static final int NOTIFICATION_ID = 2002;
@@ -62,6 +63,9 @@ public class ScreenTranslateService extends Service {
     private int screenWidth;
     private int screenHeight;
     private int densityDpi;
+    private int captureWidth,captureHeight;
+    private void stage(String text){lastStatus=text;if(layoutStatus!=null)layoutStatus.setText(text);}
+    private void feedback(String text){stage(text);Toast.makeText(this,text,Toast.LENGTH_SHORT).show();}
     private boolean busy;
     private volatile long generation;
     private volatile boolean destroyed;
@@ -70,7 +74,7 @@ public class ScreenTranslateService extends Service {
     private TextView layoutStatus;
     private boolean selectNext;
     private boolean active(long token){return !destroyed && token==generation;}
-    private void closeLayout(){generation++;busy=false;hideResult();hideSelection();frozen=null;if(bubbleView!=null)bubbleView.setVisibility(View.VISIBLE);}
+    private void closeLayout(){generation++;busy=false;hideResult();hideSelection();frozen=null;stage("Sẵn sàng · nhấn 译");if(bubbleView!=null)bubbleView.setVisibility(View.VISIBLE);}
 
 
     @Override
@@ -179,7 +183,8 @@ public class ScreenTranslateService extends Service {
         mediaProjection.registerCallback(new MediaProjection.Callback() {
             @Override
             public void onCapturedContentResize(int width,int height){
-                if(width<=0||height<=0||virtualDisplay==null)return;
+                if(width<=0||height<=0||virtualDisplay==null||(width==captureWidth&&height==captureHeight))return;
+                captureWidth=width;captureHeight=height;
                 closeLayout();
                 try{ImageReader old=imageReader;imageReader=ImageReader.newInstance(width,height,PixelFormat.RGBA_8888,2);
                     virtualDisplay.resize(width,height,densityDpi);virtualDisplay.setSurface(imageReader.getSurface());if(old!=null)old.close();
@@ -190,6 +195,7 @@ public class ScreenTranslateService extends Service {
             }
         }, main);
 
+        captureWidth=screenWidth;captureHeight=screenHeight;
         imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2);
         virtualDisplay = mediaProjection.createVirtualDisplay(
                 "XinayuScreenTranslate",
@@ -211,8 +217,10 @@ public class ScreenTranslateService extends Service {
         bubble.setGravity(Gravity.CENTER);
         android.graphics.drawable.GradientDrawable circle=new android.graphics.drawable.GradientDrawable();
         circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);circle.setColor(0xdd163b57);circle.setStroke(dp(1),0xff6bd7ef);bubble.setBackground(circle);
-        FrameLayout touch=new FrameLayout(this);touch.addView(bubble,new FrameLayout.LayoutParams(dp(32),dp(32),Gravity.CENTER));
-        bubble.setContentDescription("Dịch màn hình. Nhấn để dịch toàn màn hình, nhấn giữ để dừng.");
+        bubble.setBackground(new android.graphics.drawable.InsetDrawable(circle,dp(6)));
+        bubble.setPadding(0,0,0,0);
+        bubble.setContentDescription("Dịch màn hình. Nhấn để dịch toàn màn hình, kéo để di chuyển; giữ để dừng.");
+        bubble.setOnClickListener(v->{selectNext=false;captureForRegionSelection();});
 
         bubbleParams = new WindowManager.LayoutParams(
                 dp(44), dp(44),
@@ -224,71 +232,50 @@ public class ScreenTranslateService extends Service {
         bubbleParams.x = Math.max(0, screenWidth - dp(80));
         bubbleParams.y = dp(160);
 
-        final float[] downRaw = new float[2];
-        final int[] startPos = new int[2];
-        final boolean[] moved = new boolean[1];
-        final long[] downTime = new long[1];
-
-        touch.setOnTouchListener((v, event) -> {
-            switch (event.getActionMasked()) {
+        final float[] downRaw=new float[2];final int[] startPos=new int[2];
+        final BubbleGesture gesture=new BubbleGesture(Math.max(dp(12),android.view.ViewConfiguration.get(this).getScaledTouchSlop()));
+        bubble.setOnTouchListener((v,event)->{
+            switch(event.getActionMasked()){
                 case MotionEvent.ACTION_DOWN:
-                    downRaw[0] = event.getRawX();
-                    downRaw[1] = event.getRawY();
-                    startPos[0] = bubbleParams.x;
-                    startPos[1] = bubbleParams.y;
-                    downTime[0] = System.currentTimeMillis();
-                    moved[0] = false;
-                    return true;
+                    downRaw[0]=event.getRawX();downRaw[1]=event.getRawY();startPos[0]=bubbleParams.x;startPos[1]=bubbleParams.y;
+                    gesture.begin(event.getRawX(),event.getRawY(),event.getEventTime());v.setPressed(true);return true;
                 case MotionEvent.ACTION_MOVE:
-                    int dx = Math.round(event.getRawX() - downRaw[0]);
-                    int dy = Math.round(event.getRawY() - downRaw[1]);
-                    if (Math.abs(dx) > dp(5) || Math.abs(dy) > dp(5)) moved[0] = true;
-                    bubbleParams.x = clamp(startPos[0] + dx, 0, Math.max(0, screenWidth - dp(44)));
-                    bubbleParams.y = clamp(startPos[1] + dy, 0, Math.max(0, screenHeight - dp(44)));
-                    try { windowManager.updateViewLayout(bubbleView, bubbleParams); } catch (Exception ignored) {}
-                    return true;
+                    if(gesture.move(event.getRawX(),event.getRawY())){
+                        bubbleParams.x=clamp(startPos[0]+Math.round(event.getRawX()-downRaw[0]),0,Math.max(0,screenWidth-dp(44)));
+                        bubbleParams.y=clamp(startPos[1]+Math.round(event.getRawY()-downRaw[1]),dp(24),Math.max(dp(24),screenHeight-dp(76)));
+                        try{windowManager.updateViewLayout(bubbleView,bubbleParams);}catch(Exception ignored){}
+                    }return true;
                 case MotionEvent.ACTION_UP:
-                    long held = System.currentTimeMillis() - downTime[0];
-                    if (!moved[0] && held >= 700) {
-                        Toast.makeText(this, "Đã dừng dịch màn hình.", Toast.LENGTH_SHORT).show();
-                        stopSelf();
-                    } else if (!moved[0]) {
-                        selectNext=false;captureForRegionSelection();
-                    }
-                    if(moved[0]){bubbleParams.x=bubbleParams.x+dp(22)<screenWidth/2?0:Math.max(0,screenWidth-dp(44));try{windowManager.updateViewLayout(bubbleView,bubbleParams);}catch(Exception ignored){}}
+                    v.setPressed(false);BubbleGesture.End end=gesture.end(event.getRawX(),event.getRawY(),event.getEventTime());
+                    if(end==BubbleGesture.End.TAP)v.performClick();
+                    else if(end==BubbleGesture.End.HOLD){feedback("Đã dừng dịch màn hình.");stopSelf();}
+                    else if(end==BubbleGesture.End.DRAG){bubbleParams.x=ScreenLayoutGeometry.bubbleEdge(bubbleParams.x,screenWidth,dp(44));try{windowManager.updateViewLayout(bubbleView,bubbleParams);}catch(Exception ignored){}}
                     return true;
-                default:
-                    return false;
+                case MotionEvent.ACTION_CANCEL:gesture.cancel();v.setPressed(false);return true;
+                default:return true;
             }
         });
-
-        bubbleView = touch;
+        bubbleView=bubble;stage("Sẵn sàng · nhấn 译");
         windowManager.addView(bubbleView, bubbleParams);
     }
 
     private void captureForRegionSelection() {
-        if (busy || imageReader == null) return;
-        busy = true;
-        final long token=++generation;
-        hideResult();hideSelection();frozen=null;
-        try{Image stale=imageReader.acquireLatestImage();if(stale!=null)stale.close();}catch(Exception ignored){}
-        if (bubbleView != null) bubbleView.setVisibility(View.INVISIBLE);
-
-        main.postDelayed(() -> {
-            if(!active(token))return;
-            Bitmap bitmap;
-            try {
-                bitmap = acquireLatestBitmap();
-            } catch (Exception e) {
-                finishBusyWithError("Không chụp được màn hình: " + safeMessage(e));
-                return;
-            }
-            if (bitmap == null) {
-                finishBusyWithError("Chưa lấy được khung hình. Hãy bấm lại bong bóng.");
-                return;
-            }
+        if(busy){feedback("Đang xử lý. Bấm Đóng trên ảnh để hủy trước khi dịch lại.");return;}
+        if(imageReader==null||mediaProjection==null){feedback("Phiên chụp đã dừng. Mở ứng dụng, tắt rồi bật lại dịch màn hình.");return;}
+        busy=true;final long token=++generation;hideResult();hideSelection();frozen=null;
+        feedback("Đang chụp màn hình…");
+        if(bubbleView!=null)bubbleView.setVisibility(View.INVISIBLE);
+        // Keep the latest available frame: static app-only captures may not produce a new one after hiding the bubble.
+        main.postDelayed(()->takeFrame(token,0),200);
+        main.postDelayed(()->{if(active(token)&&busy){generation++;finishBusyWithError("Quá thời gian chụp/OCR/dịch. Không tự gọi lại API. Hãy thử lại hoặc bật lại phiên chụp.");}},45000);
+    }
+    private void takeFrame(long token,int attempt){
+        if(!active(token))return;
+        try{
+            Bitmap bitmap=acquireLatestBitmap();
+            if(bitmap==null){if(attempt<8){main.postDelayed(()->takeFrame(token,attempt+1),100);return;}finishBusyWithError("Không nhận được ảnh chụp. Mở lại phiên dịch và chọn chia sẻ toàn màn hình.");return;}
             if(selectNext)showRegionSelector(bitmap);else{selectionBitmap=bitmap;processSelectedBitmap(null);}
-        }, 250);
+        }catch(Exception e){finishBusyWithError("Không mở được ảnh dịch: "+safeMessage(e));}
     }
 
     private void showRegionSelector(Bitmap bitmap) {
@@ -355,10 +342,11 @@ public class ScreenTranslateService extends Service {
         Bitmap base=selectionBitmap;selectionBitmap=null;removeSelectionViewOnly();
         if(base==null||base.isRecycled()){finishBusyWithError("Ảnh chụp đã mất, hãy thử lại.");return;}
         frozen=base;final long token=++generation;busy=true;
+        main.postDelayed(()->{if(active(token)&&busy){generation++;busy=false;stage("Quá thời gian đọc chữ/dịch. Bấm Đóng hoặc Dịch lại; API không tự thử lại.");}},45000);
         if(bubbleView!=null)bubbleView.setVisibility(View.INVISIBLE);
         Rect crop=rect==null?new Rect(0,0,base.getWidth(),base.getHeight()):new Rect(rect);
         crop.intersect(0,0,base.getWidth(),base.getHeight());
-        showLayout(base,"Đang đọc chữ Trung…");
+        stage("Đang đọc chữ Trung…");showLayout(base,lastStatus);
         final Bitmap input;
         try{Bitmap cut=Bitmap.createBitmap(base,crop.left,crop.top,crop.width(),crop.height());
             Bitmap scaled=downscaleForOcr(cut);input=scaled==base?base.copy(Bitmap.Config.ARGB_8888,false):scaled;
@@ -370,15 +358,15 @@ public class ScreenTranslateService extends Service {
                 java.util.List<ScreenRegion> mapped=new java.util.ArrayList<>();
                 for(ScreenRegion r:regions)mapped.add(r.remap(crop.left/(double)base.getWidth(),crop.top/(double)base.getHeight(),crop.width()/(double)base.getWidth(),crop.height()/(double)base.getHeight()));
                 java.util.List<ScreenRegion> batch=ScreenLayoutBatch.select(mapped);
-                layoutStatus.setText("Đang dịch "+batch.size()+" khối chữ…");
+                stage("Đang dịch "+batch.size()+" khối chữ…");
                 ScreenLayoutTranslationEngine.translate(ScreenTranslateService.this,batch,()->active(token),new ScreenLayoutTranslationEngine.Callback(){
                     public void success(java.util.List<ScreenRegion> values,String warning,boolean cached){
-                        busy=false;canvas.regions(values);layoutStatus.setText((cached?"⚡ ":"")+"Chạm khối chữ để xem đầy đủ. Đóng để cuộn trang."+(warning.isEmpty()?"":"\n⚠ "+warning));
+                        busy=false;stage("Đã dịch "+values.size()+" khối chữ");canvas.regions(values);layoutStatus.setText((cached?"⚡ ":"")+"Chạm khối chữ để xem đầy đủ. Đóng để cuộn trang."+(warning.isEmpty()?"":"\n⚠ "+warning));
                     }
-                    public void error(String message){busy=false;layoutStatus.setText("Lỗi: "+message);}
+                    public void error(String message){busy=false;stage("Lỗi dịch: "+message);}
                 });
             }
-            public void onError(String message){input.recycle();if(active(token)){busy=false;layoutStatus.setText("OCR: "+message);}}
+            public void onError(String message){input.recycle();if(active(token)){busy=false;stage("OCR: "+message);}}
         });
     }
 
@@ -436,6 +424,7 @@ public class ScreenTranslateService extends Service {
     }
 
     private void finishBusyWithError(String message) {
+        stage(message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();
         busy = false;
         hideSelection();
         if (bubbleView != null) bubbleView.setVisibility(View.VISIBLE);
@@ -541,7 +530,7 @@ public class ScreenTranslateService extends Service {
         if (selectionOverlay != null) {
             try { windowManager.removeView(selectionOverlay); } catch (Exception ignored) {}
             selectionOverlay = null;
-            if(canvas!=null){canvas.release();canvas=null;}
+            if(canvas!=null){canvas.release();canvas=null;}layoutStatus=null;
         }
     }
 
@@ -590,7 +579,7 @@ public class ScreenTranslateService extends Service {
     @Override
     public void onDestroy() {
         destroyed=true;generation++;main.removeCallbacksAndMessages(null);
-        running = false;
+        running = false;lastStatus="Đã dừng";
         hideResult();
         hideSelection();
         if (bubbleView != null) {
