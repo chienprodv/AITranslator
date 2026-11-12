@@ -108,12 +108,12 @@ public class TranslatorImeService extends InputMethodService {
         keyboardRoot = new LinearLayout(this);
         keyboardRoot.setOrientation(LinearLayout.VERTICAL);
         keyboardRoot.setBackgroundColor(0xffe4e5e7);
-        keyboardRoot.setPadding(dp(4), dp(3), dp(4), dp(28));
+        keyboardRoot.setPadding(dp(4), dp(3), dp(4), dp(28) + bottomGap());
         keyboardRoot.setOnApplyWindowInsetsListener((v, insets) -> {
             int bottom = Build.VERSION.SDK_INT >= 30
                     ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom
                     : insets.getSystemWindowInsetBottom();
-            v.setPadding(dp(4), dp(3), dp(4), Math.max(dp(28), bottom));
+            v.setPadding(dp(4), dp(3), dp(4), Math.max(dp(28), bottom) + bottomGap());
             return insets;
         });
 
@@ -1049,6 +1049,8 @@ public class TranslatorImeService extends InputMethodService {
         b.setStateListAnimator(null);
         b.setElevation(dp(1));
     }
+
+    private int bottomGap() { return dp(KeyboardLighting.bottomGap(KeyboardData.prefs(this).getInt("bottom_gap", 28))); }
 
     private int dp(int v) {
         return Math.round(
