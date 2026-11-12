@@ -469,8 +469,10 @@ public class TranslatorImeService extends InputMethodService {
     }
 
     private void enter() {
-        commit("\n");
         autoHandler.removeCallbacks(autoTranslateRunnable);
+        stopVoice();invalidateTranslation();TelexComposer.reset();swipeChoice=false;
+        EditorAction.dispatch(getCurrentInputConnection(),getCurrentInputEditorInfo());
+        updateCandidates();
     }
 
     @Override public boolean onEvaluateFullscreenMode() { return false; }
@@ -787,7 +789,7 @@ public class TranslatorImeService extends InputMethodService {
         String theme = KeyboardData.prefs(this).getString("theme", "system");
         return "dark".equals(theme) || "system".equals(theme) && (getResources().getConfiguration().uiMode & 48) == 32;
     }
-    private void refreshSurface() { if (surface != null) surface.state(symbolPage, shifted, capsLock, english, numericHost, privateEditor); }
+    private void refreshSurface() { if (surface != null) {surface.editorActionLabel(EditorAction.label(getCurrentInputEditorInfo()));surface.state(symbolPage, shifted, capsLock, english, numericHost, privateEditor);} }
     private void surfaceKey(String code) {
         switch (code) {
             case "SHIFT": if (symbolPage > 0) symbolPage = symbolPage == 1 ? 2 : 1; else { shifted = !shifted; capsLock = false; } refreshSurface(); return;
