@@ -10,43 +10,114 @@ public final class TelexComposer {
 
     private TelexComposer() {}
 
+    private static String prefix = "", raw = "", rendered = "";
+
+    public static void reset() { prefix = ""; raw = ""; rendered = ""; }
+
     public static boolean handle(InputConnection ic, char key) {
-        if (ic == null) return false;
-        CharSequence before = ic.getTextBeforeCursor(80, 0);
-        String word = currentWord(before == null ? "" : before.toString());
-        char k = Character.toLowerCase(key);
-
-        if ("sfrxjz".indexOf(k) >= 0 && !word.isEmpty() && hasVowel(word)) {
-            int tone = toneFor(k);
-            String transformed = applyTone(word, tone);
-            if (!transformed.equals(word)) {
-                replaceWord(ic, word, transformed);
-                return true;
-            }
+        if (ic == null || !Character.isLetter(key)) return false;
+        CharSequence selection = ic.getSelectedText(0);
+        String before = text(ic.getTextBeforeCursor(512, 0));
+        if ((selection != null && selection.length() > 0) || !before.equals(prefix + rendered)) {
+            String word = selection != null && selection.length() > 0 ? "" : currentWord(before);
+            prefix = before.substring(0, before.length() - word.length());
+            raw = word; rendered = word;
         }
+        raw += key;
+        String next = compose(raw);
+        ic.beginBatchEdit();
+        try {
+            if (selection == null || selection.length() == 0) ic.deleteSurroundingText(rendered.length(), 0);
+            ic.commitText(next, 1);
+        } finally { ic.endBatchEdit(); }
+        rendered = next;
+        return true;
+    }
 
-        if (k == 'w' && !word.isEmpty()) {
-            String transformed = applyW(word);
-            if (!transformed.equals(word)) {
-                replaceWord(ic, word, transformed);
-                return true;
-            }
-        }
+    private static String text(CharSequence value) { return value == null ? "" : value.toString(); }
 
-        if (!word.isEmpty()) {
-            char last = word.charAt(word.length() - 1);
-            char lastLower = Character.toLowerCase(last);
-            String transformed = null;
-            if (k == 'a' && lastLower == 'a') transformed = word.substring(0, word.length() - 1) + matchCase(last, 'â');
-            if (k == 'e' && lastLower == 'e') transformed = word.substring(0, word.length() - 1) + matchCase(last, 'ê');
-            if (k == 'o' && lastLower == 'o') transformed = word.substring(0, word.length() - 1) + matchCase(last, 'ô');
-            if (k == 'd' && lastLower == 'd') transformed = word.substring(0, word.length() - 1) + matchCase(last, 'đ');
-            if (transformed != null) {
-                replaceWord(ic, word, transformed);
-                return true;
+    /** Raw keystrokes let a repeated modifier undo its transformation without losing letters. */
+    public static String compose(String source) {
+        String lower = source.toLowerCase(java.util.Locale.ROOT);
+        if (java.util.Arrays.asList("asus", "dell", "acer", "lenovo", "samsung", "iphone", "windows", "wifi", "usb").contains(lower)) return source;
+        if (source.length() == 3 && "aeoAEO".indexOf(source.charAt(0)) >= 0
+                && Character.toLowerCase(source.charAt(0)) == Character.toLowerCase(source.charAt(2))
+                && "sfrxj".indexOf(Character.toLowerCase(source.charAt(1))) >= 0) return source;
+        String result = "";
+        int toneIndex = -1;
+        boolean literal = false;
+        for (int i = 0; i < source.length(); i++) {
+            char c = source.charAt(i), k = Character.toLowerCase(c);
+            if (!literal && "sfrxjz".indexOf(k) >= 0 && hasVowel(result)) {
+                int tone = toneFor(k);
+                int oldTone = wordTone(result);
+                if (tone > 0 && oldTone == tone) {
+                    if (toneIndex >= 0 && i > toneIndex + 1) return source;
+                    result = applyTone(result, 0) + c;
+                    literal = true;
+                } else { result = applyTone(result, tone); toneIndex = i; }
+                continue;
             }
+            if (!literal && !result.isEmpty()) {
+                int lastIndex = result.length() - 1;
+                char last = result.charAt(lastIndex), base = baseVowel(last);
+                char shape = k == 'a' ? 'â' : k == 'e' ? 'ê' : k == 'o' ? 'ô' : 0;
+                if (shape != 0 && base == k) {
+                    result = result.substring(0, lastIndex) + toneChar(matchCase(last, shape), toneOf(last));
+                    continue;
+                }
+                if (shape != 0 && base == shape) {
+                    result = result.substring(0, lastIndex) + toneChar(matchCase(last, k), toneOf(last)) + c;
+                    literal = true; continue;
+                }
+                if (k == 'd' && Character.toLowerCase(last) == 'd') {
+                    result = result.substring(0, lastIndex) + matchCase(last, 'đ'); continue;
+                }
+                if (k == 'd' && Character.toLowerCase(last) == 'đ') {
+                    result = result.substring(0, lastIndex) + matchCase(last, 'd') + c;
+                    literal = true; continue;
+                }
+                if (k == 'w') {
+                    String changed = applyWordW(result);
+                    if (!changed.equals(result)) { result = changed; continue; }
+                }
+            }
+            int tone = wordTone(result);
+            result += c;
+            if (!literal && tone > 0) result = applyTone(result, tone);
         }
-        return false;
+        return result;
+    }
+
+    private static int toneOf(char c) {
+        String all = "áắấéếíóốớúứýàằầèềìòồờùừỳảẳẩẻểỉỏổởủửỷãẵẫẽễĩõỗỡũữỹạặậẹệịọộợụựỵ";
+        int index = all.indexOf(Character.toLowerCase(c));
+        return index < 0 ? 0 : index / 12 + 1;
+    }
+    private static int wordTone(String word) {
+        for (char c : word.toCharArray()) if (toneOf(c) > 0) return toneOf(c);
+        return 0;
+    }
+    private static String applyWordW(String word) {
+        char[] chars = word.toCharArray();
+        int last = -1;
+        for (int i = 0; i < chars.length; i++) if (isVowel(chars[i])) last = i;
+        if (last < 0) return word;
+        int tone = wordTone(word);
+        char base = baseVowel(chars[last]);
+        if (base == 'ơ' || base == 'ư' || base == 'ă') {
+            for (int i = 0; i < chars.length; i++) {
+                char b = baseVowel(chars[i]);
+                if (b == 'ơ' || b == 'ư' || b == 'ă') chars[i] = matchCase(chars[i], b == 'ơ' ? 'o' : b == 'ư' ? 'u' : 'a');
+            }
+            return applyTone(new String(chars), tone) + "w";
+        }
+        if (base == 'o' && last > 0 && baseVowel(chars[last - 1]) == 'u') {
+            chars[last - 1] = matchCase(chars[last - 1], 'ư'); chars[last] = matchCase(chars[last], 'ơ');
+        } else if (base == 'a' || base == 'o' || base == 'u') {
+            chars[last] = matchCase(chars[last], base == 'a' ? 'ă' : base == 'o' ? 'ơ' : 'ư');
+        } else return word;
+        return applyTone(new String(chars), tone);
     }
 
     private static String applyW(String word) {
@@ -98,7 +169,7 @@ public final class TelexComposer {
             else {
                 int lastIdx = vowels.get(vowels.size() - 1);
                 boolean endsWithVowel = lastIdx == chars.length - 1;
-                target = endsWithVowel ? vowels.get(0) : lastIdx;
+                target = endsWithVowel ? vowels.get(vowels.size() >= 3 ? vowels.size() - 2 : 0) : lastIdx;
             }
         }
         chars[target] = toneChar(chars[target], tone);
