@@ -45,7 +45,10 @@ public final class DirectionalTranslationEngine {
             return;
         }
 
-        BiTranslationResult local = LocalPhrasebook.translateDirectional(text, dir, ctx);
+        boolean useLocal = "polite".equals(KeyboardData.prefs(context).getString("tone", "polite"))
+                && KeyboardData.prefs(context).getString("lock_terms", "").isEmpty()
+                && !text.equals(KeyboardData.prefs(context).getString("alternative_source", ""));
+        BiTranslationResult local = useLocal ? LocalPhrasebook.translateDirectional(text, dir, ctx) : null;
         if (local != null) {
             CACHE.put(key, local);
             HistoryStore.add(context, dir.equals(VI_TO_ZH) ? "VOICE VI→中 · local" : "VOICE 中→VI · local",
