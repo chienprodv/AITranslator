@@ -42,7 +42,7 @@ public final class KeyboardModel {
     }
     private void add(String value, double x, int y, double width) { keys.add(new Key(value, x, y, width, 1)); }
     public Key hit(double x, double y) {
-        if (x < -0.3 || x > 10.3 || y < -0.2 || y > 5.2) return null;
+        if (x < -0.3 || x > 10.3 || y < -0.2 || y >= 5) return null;
         Key nearest = null;
         double distance = Double.MAX_VALUE;
         for (Key key : keys) {
