@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
         keyboardSettings.setOnClickListener(v -> startActivity(new Intent(this, KeyboardOptionsActivity.class)));
         root.addView(keyboardSettings);
         root.addView(text(
-                "Bản 1.3.0 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
+                "Bản 1.4.0 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
                 14, false));
 
         addSpacer(root, 16);
@@ -233,7 +233,7 @@ public class MainActivity extends Activity {
         addSpacer(root, 20);
         root.addView(text("4. Dịch màn hình", 19, true));
         root.addView(text(
-                "Nhấn bong bóng 译 → chụp màn hình → kéo chọn đúng vùng chữ → OCR trên điện thoại → chỉ gửi text lên AI.",
+                "Nhấn 译 để dịch đè chữ Trung lên ảnh chụp. Giữ xem gốc, chọn vùng hoặc chạm khối chữ để xem đủ. Đóng ảnh để cuộn trang; chỉ chữ OCR được gửi lên AI.",
                 13, false));
         screenStatus = text("", 13, false);
         root.addView(screenStatus);
@@ -356,7 +356,7 @@ public class MainActivity extends Activity {
         else startService(service);
 
         Toast.makeText(this,
-                "Đã bật. Nhấn 译 rồi kéo vùng cần dịch; nhấn giữ bong bóng để dừng.",
+                "Đã bật. Nhấn 译 để dịch toàn màn hình, hoặc bấm Chọn vùng; nhấn giữ bong bóng để dừng.",
                 Toast.LENGTH_LONG).show();
         updateScreenStatus();
     }
