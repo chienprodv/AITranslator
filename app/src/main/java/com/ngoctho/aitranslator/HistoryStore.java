@@ -48,7 +48,14 @@ public final class HistoryStore {
     public static synchronized JSONArray list(Context context) {
         try {
             String s = context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY, "[]");
-            return new JSONArray(s == null ? "[]" : s);
+            JSONArray old = new JSONArray(s == null ? "[]" : s), next = new JSONArray();
+            long ttl = Math.max(1, KeyboardData.prefs(context).getInt("history_ttl_days", 30)) * 86400000L;
+            for (int i = 0; i < old.length(); i++) {
+                JSONObject item = old.optJSONObject(i);
+                if (item != null && System.currentTimeMillis() - item.optLong("time", 0) < ttl) next.put(item);
+            }
+            context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY, next.toString()).apply();
+            return next;
         } catch (Exception e) {
             return new JSONArray();
         }
