@@ -119,7 +119,7 @@ public class ScreenTranslateService extends Service {
 
         Notification notification = new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_view)
-                .setContentTitle("Ngọc Thọ AI Translator")
+                .setContentTitle("XinayuAITranslator")
                 .setContentText("Dịch màn hình đang hoạt động · nhấn bong bóng 译")
                 .setContentIntent(pending)
                 .setOngoing(true)
@@ -167,7 +167,7 @@ public class ScreenTranslateService extends Service {
 
         imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2);
         virtualDisplay = mediaProjection.createVirtualDisplay(
-                "NgocThoScreenTranslate",
+                "XinayuScreenTranslate",
                 screenWidth,
                 screenHeight,
                 densityDpi,
