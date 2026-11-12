@@ -74,7 +74,7 @@ public class TranslatorImeService extends InputMethodService {
     private boolean ttsReady;
     private Button translateButton, microphoneButton;
     private boolean capsLock, english, privateEditor, insertOnly, listening;
-    private int symbolPage, panel, emojiCategory;
+    private int symbolPage, panel, emojiCategory, emojiPage;
     private String libraryQuery = "";
     private boolean savedOnly = true;
     private SpeechRecognizer recognizer;
@@ -657,46 +657,41 @@ public class TranslatorImeService extends InputMethodService {
         scroll.addView(list); keyboardRoot.addView(scroll, new LinearLayout.LayoutParams(-1, dp(210)));
     }
 
-    private static final String[] EMOJI = {
-        "",
-        "😀 😃 😄 😁 😆 😅 😂 🙂 🙃 😉 😊 😍 🥰 😘 😎 🤔 😐 😑 😴 😭 😢 😤 😡 😱 😳 🥳 🤣 🤗 🤫 🤝 🙏",
-        "👍 👎 👌 ✌️ 🤞 🤟 🤘 👋 🤚 ✋ 👏 🙌 👐 🤲 💪 🫶 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💯 ✅ ❌ ⚠️ 🔥 ⭐ ✨",
-        "📦 🚚 🛒 💰 💵 💴 💳 🧾 📅 ⏰ 📞 📱 💻 🔌 🔋 🛠️ 🔧 ⚙️ 📷 📍 🏠 ✈️ ☀️ 🌧️ 🍀 🎉 🎁 ☕ 🍺 🍎 🇻🇳 🇨🇳"
-    };
-
     private void showEmojiPanel() {
-        LinearLayout categories = new LinearLayout(this);
-        String[] names = {"Gần đây", "Mặt", "Cử chỉ", "Đồ vật"};
-        for (int i = 0; i < names.length; i++) {
+        android.widget.HorizontalScrollView tabs=new android.widget.HorizontalScrollView(this);
+        LinearLayout categories=new LinearLayout(this);
+        for(int i=0;i<EmojiRepository.CATEGORIES.length;i++){
             final int category = i;
-            addTool(categories, names[i], names[i], () -> { emojiCategory = category; rebuildKeyboard(); });
-        }
-        addTool(categories, "ABC", "Trở về bàn phím", () -> { panel = 0; rebuildKeyboard(); });
-        keyboardRoot.addView(categories);
-        String data = emojiCategory == 0 ? getSharedPreferences("keyboard_ui", MODE_PRIVATE).getString("recent_emoji", "") : EMOJI[emojiCategory];
-        if (data == null || data.isEmpty()) data = EMOJI[1];
+            Button tab=smallButton((emojiCategory==i?"✓ ":"")+EmojiRepository.CATEGORIES[i]);
+            tab.setMinWidth(dp(82));tab.setPadding(dp(8),0,dp(8),0);
+            tab.setOnClickListener(v->{emojiCategory=category;emojiPage=0;rebuildKeyboard();});
+            categories.addView(tab,new LinearLayout.LayoutParams(-2,dp(34)));
+        }tabs.addView(categories);keyboardRoot.addView(tabs);
+        List<EmojiRepository.Entry> entries=EmojiRepository.category(this,emojiCategory,privateEditor);
+        final int pageSize=emojiCategory==12?18:64,columns=emojiCategory==12?3:8;
+        int pages=Math.max(1,(entries.size()+pageSize-1)/pageSize);emojiPage=Math.max(0,Math.min(pages-1,emojiPage));
+        LinearLayout controls=new LinearLayout(this);
+        addTool(controls,"ABC","Trở về bàn phím",()->openPanel(0));
+        Button previous=addTool(controls,"‹","Trang emoji trước",()->{emojiPage--;rebuildKeyboard();});previous.setEnabled(emojiPage>0);
+        addTool(controls,(emojiPage+1)+"/"+pages,entries.size()+" biểu tượng trong nhóm",()->toast("Giữ biểu tượng để thêm/bỏ yêu thích. Kéo thanh nhóm sang ngang."));
+        Button next=addTool(controls,"›","Trang emoji tiếp",()->{emojiPage++;rebuildKeyboard();});next.setEnabled(emojiPage+1<pages);
+        keyboardRoot.addView(controls);
         ScrollView scroll = new ScrollView(this);
         LinearLayout grid = new LinearLayout(this); grid.setOrientation(LinearLayout.VERTICAL);
-        String[] entries = data.split(" ");
         LinearLayout row = null;
-        for (int i = 0; i < entries.length; i++) {
-            if (i % 8 == 0) { row = new LinearLayout(this); grid.addView(row); }
-            final String emoji = entries[i];
-            Button key = keyButton(emoji);
+        int start=emojiPage*pageSize,end=Math.min(entries.size(),start+pageSize);
+        for (int i=start;i<end;i++) {
+            if((i-start)%columns==0){row=new LinearLayout(this);grid.addView(row);}
+            final EmojiRepository.Entry entry=entries.get(i);Button key=keyButton(entry.value);
+            key.setContentDescription(entry.label+"; giữ để lưu yêu thích");
             key.setOnClickListener(v -> {
-                commit(emoji);
-                if (!privateEditor) {
-                    String old = getSharedPreferences("keyboard_ui", MODE_PRIVATE).getString("recent_emoji", "");
-                    StringBuilder recent = new StringBuilder(emoji); int used = 1;
-                    for (String previous : (old == null ? "" : old).split(" ")) {
-                        if (!previous.isEmpty() && !previous.equals(emoji) && used++ < 24) recent.append(" ").append(previous);
-                    }
-                    getSharedPreferences("keyboard_ui", MODE_PRIVATE).edit().putString("recent_emoji", recent.toString()).apply();
-                }
+                commit(entry.value);if(!privateEditor)EmojiRepository.recent(this,entry.value);
             });
+            key.setOnLongClickListener(v->{if(privateEditor){toast("Ô riêng tư không lưu biểu tượng.");return true;}try{toast(EmojiRepository.toggleFavorite(this,entry.value)?"Đã thêm vào Yêu thích":"Đã bỏ Yêu thích");if(emojiCategory==1)rebuildKeyboard();}catch(Exception e){toast(e.getMessage());}return true;});
             row.addView(key, weighted(1, 42));
-            if (i == entries.length - 1) for (int j = i % 8 + 1; j < 8; j++) row.addView(new View(this), weighted(1, 42));
+            if(i==end-1)for(int j=(i-start)%columns+1;j<columns;j++)row.addView(new View(this),weighted(1,42));
         }
+        if(entries.isEmpty())grid.addView(resultLine("Giữ một emoji để lưu vào nhóm Yêu thích."));
         scroll.addView(grid); keyboardRoot.addView(scroll, new LinearLayout.LayoutParams(-1, dp(210)));
     }
 
