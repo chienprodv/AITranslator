@@ -475,6 +475,10 @@ public class TranslatorImeService extends InputMethodService {
         updateCandidates();
     }
 
+    private Float previousRefresh;
+    @Override public void onWindowShown(){super.onWindowShown();if(surface!=null)surface.resumeEffects();android.view.Window window=getWindow()==null?null:getWindow().getWindow();if(window!=null){if(previousRefresh==null)previousRefresh=window.getAttributes().preferredRefreshRate;HighRefresh.request(window);}}
+    @Override public void onWindowHidden(){if(surface!=null)surface.pauseEffects();android.view.Window window=getWindow()==null?null:getWindow().getWindow();if(window!=null&&previousRefresh!=null){android.view.WindowManager.LayoutParams attrs=window.getAttributes();attrs.preferredRefreshRate=previousRefresh;window.setAttributes(attrs);previousRefresh=null;}super.onWindowHidden();}
+
     @Override public boolean onEvaluateFullscreenMode() { return false; }
 
     @Override public void onStartInputView(EditorInfo info, boolean restarting) {
