@@ -98,6 +98,7 @@ public final class ApiClient {
             String source,
             String direction,
             int maxTokens) throws Exception {
+        PrivacyConsent.require(context);
         String provider = AppPrefs.provider(context);
         String upstream = AppPrefs.upstreamProvider(provider);
         String model = AppPrefs.model(context, provider);
