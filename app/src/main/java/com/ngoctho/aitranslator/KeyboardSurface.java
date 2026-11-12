@@ -30,7 +30,7 @@ public final class KeyboardSurface extends View {
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener styleListener=(prefs,key)->{
         if(key==null||STYLE_KEYS.contains(key))reloadStyle();
     };
-    private static final Set<String> STYLE_KEYS=new HashSet<>(Arrays.asList("key_height","key_font","one_hand","theme","led_mode","rgb_flash","led_brightness","led_speed","led_reverse","three_colors","color_left","color_middle","color_right","led_color","haptic","key_sound","swipe"));
+    private static final Set<String> STYLE_KEYS=new HashSet<>(Arrays.asList("key_height","key_font","one_hand","theme","led_mode","rgb_press","led_brightness","led_speed","led_reverse","three_colors","color_left","color_middle","color_right","led_color","haptic","key_sound","swipe"));
     private android.content.SharedPreferences settings;
     private final Typeface keyTypeface=Typeface.create("sans-serif",Typeface.NORMAL);
     private final List<KeyVisual> visuals=new ArrayList<>();
