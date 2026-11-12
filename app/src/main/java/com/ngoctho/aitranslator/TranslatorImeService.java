@@ -194,6 +194,8 @@ public class TranslatorImeService extends InputMethodService {
         actions.addView(microphoneButton, weighted(0.8f, 36));
         addTool(actions, "☰", "Câu đã lưu và câu mẫu", () -> { panel = panel == 1 ? 0 : 1; rebuildKeyboard(); });
         addTool(actions, "😊", "Emoji", () -> { panel = panel == 2 ? 0 : 2; rebuildKeyboard(); });
+        Button led=addTool(actions,"💡","Studio LED: chế độ, độ sáng và tốc độ",()->openPanel(panel==6?0:6));
+        led.setOnLongClickListener(v->{cycleLed();return true;});
         addTool(actions, "⋯", "Sửa chữ, dịch và cài đặt", () -> { panel = panel == 3 ? 0 : 3; rebuildKeyboard(); });
 
         keyboardRoot.addView(actions);
@@ -208,6 +210,7 @@ public class TranslatorImeService extends InputMethodService {
         if (panel == 3) { showMorePanel(); return; }
         if (panel == 4) { showClipboardPanel(); return; }
         if (panel == 5) { showTemplatePanel(); return; }
+        if (panel == 6) { showLedPanel(); return; }
         candidateRow = new LinearLayout(this); keyboardRoot.addView(candidateRow); updateCandidates();
         surface = new KeyboardSurface(this, new KeyboardSurface.Listener() {
             public void key(String code) { surfaceKey(code); }
@@ -524,6 +527,7 @@ public class TranslatorImeService extends InputMethodService {
 
     @Override
     public void onFinishInputView(boolean finishingInput) {
+        if(surface!=null)surface.pauseEffects();
         autoHandler.removeCallbacks(autoTranslateRunnable);
         invalidateTranslation();
         stopVoice(); TelexComposer.reset(); readRequested = false; if (tts != null) tts.stop();
@@ -704,6 +708,7 @@ public class TranslatorImeService extends InputMethodService {
     }
 
     private void toggleVoice() {
+        if(!PrivacyConsent.allowed(this)){toast("Mở ứng dụng → Quyền riêng tư để cho phép xử lý giọng nói trước.");return;}
         if (listening) { if (recognizer != null) recognizer.stopListening(); return; }
         if (privateEditor) { toast("Ô riêng tư: không bật micro hoặc AI."); return; }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -947,9 +952,49 @@ public class TranslatorImeService extends InputMethodService {
     }
     private void panelScroll(LinearLayout list, int height) { ScrollView scroll = new ScrollView(this); scroll.addView(list); keyboardRoot.addView(scroll, new LinearLayout.LayoutParams(-1, dp(height))); }
     private void openPanel(int value) { panel = value; autoHandler.removeCallbacks(autoTranslateRunnable); rebuildKeyboard(); }
+    private void cycleLed() {
+        String current=KeyboardData.ledMode(this);int at=Arrays.asList(KeyboardLighting.MODES).indexOf(current);
+        String next=KeyboardLighting.MODES[(at+1)%KeyboardLighting.MODES.length];
+        KeyboardData.prefs(this).edit().putString("led_mode",next).apply();
+        toast("LED · "+KeyboardLighting.name(next));openPanel(0);
+    }
+    private void ledSlider(LinearLayout list,String title,String key,int min,int max,int fallback) {
+        int current=Math.max(min,Math.min(max,KeyboardData.prefs(this).getInt(key,fallback)));
+        TextView label=resultLine(title+": "+current);list.addView(label);
+        android.widget.SeekBar bar=new android.widget.SeekBar(this);bar.setMax(max-min);bar.setProgress(current-min);
+        bar.setContentDescription(title);
+        bar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(android.widget.SeekBar b,int n,boolean user){if(user){KeyboardData.prefs(TranslatorImeService.this).edit().putInt(key,min+n).apply();label.setText(title+": "+(min+n));}}
+            public void onStartTrackingTouch(android.widget.SeekBar b){} public void onStopTrackingTouch(android.widget.SeekBar b){}
+        });list.addView(bar,new LinearLayout.LayoutParams(-1,dp(36)));
+    }
+    private void showLedPanel() {
+        LinearLayout controls=new LinearLayout(this);
+        addTool(controls,"ABC","Trở về bàn phím",()->openPanel(0));
+        addTool(controls,"Mode ›","Hiệu ứng LED tiếp theo",this::cycleLed);
+        addTool(controls,"Nền tối","Dùng nền tối để thấy rõ viền LED",()->{KeyboardData.prefs(this).edit().putString("theme","dark").apply();onStartInputView(getCurrentInputEditorInfo(),true);});
+        keyboardRoot.addView(controls);LinearLayout list=vertical();
+        list.addView(resultLine("STUDIO LED · "+KeyboardLighting.name(KeyboardData.ledMode(this))));
+        ledSlider(list,"Độ sáng (%)","led_brightness",0,100,70);
+        ledSlider(list,"Tốc độ · 1 chậm / 5 nhanh","led_speed",1,5,3);
+        panelAction(list,KeyboardData.prefs(this).getBoolean("led_reverse",false)?"Đảo chiều ✓":"Đảo chiều",()->{boolean reverse=KeyboardData.prefs(this).getBoolean("led_reverse",false);KeyboardData.prefs(this).edit().putBoolean("led_reverse",!reverse).apply();rebuildKeyboard();});
+        for(int i=0;i<KeyboardLighting.MODES.length;i+=2){
+            LinearLayout row=new LinearLayout(this);
+            for(int j=i;j<Math.min(i+2,KeyboardLighting.MODES.length);j++){
+                final String mode=KeyboardLighting.MODES[j];boolean active=mode.equals(KeyboardData.ledMode(this));
+                Button button=addTool(row,(active?"✓ ":"")+KeyboardLighting.NAMES[j],KeyboardLighting.NAMES[j],()->{KeyboardData.prefs(this).edit().putString("led_mode",mode).apply();openPanel(0);});
+                button.setSingleLine(false);button.setMaxLines(2);
+                if(active)button.setBackgroundTintList(ColorStateList.valueOf(isDark()?0xff314e6e:0xffcce6ff));
+            }list.addView(row);
+        }
+        panelAction(list,"Màu nền, bảng màu và xem thử LED",()->startActivity(new Intent(this,KeyboardOptionsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        list.addView(resultLine("Giữ 💡 để đổi mode nhanh. Sóng mặc định 70% sáng; hiệu ứng dừng khi ẩn bàn phím."));
+        panelScroll(list,280);
+    }
     private void showMorePanel() {
         LinearLayout list = vertical();
         panelAction(list, "ABC · Trở về phím", () -> openPanel(0));
+        panelAction(list, "💡 Studio LED · nhiều hiệu ứng, sáng và tốc độ", () -> openPanel(6));
         panelAction(list, directionLabel() + " · đổi chiều dịch", () -> setDirection(!reverse));
         panelAction(list, autoEnabled ? "AUTO đang bật · tắt" : "AUTO đang tắt · bật", () -> {
             if (privateEditor) { toast("Ô riêng tư không dùng AI."); return; }
