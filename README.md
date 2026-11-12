@@ -1,4 +1,6 @@
-# Ngọc Thọ AI Translator 1.0
+# Ngọc Thọ AI Translator 1.2.0
+
+Bản 1.2.0: sửa vùng chạm và Telex; bổ sung tùy chỉnh bàn phím, gợi ý/vuốt, câu mẫu, clipboard, dịch hai chiều, thống kê và sao lưu. Xem [hướng dẫn bàn phím 1.2](docs/KEYBOARD_1.2.md).
 
 Ứng dụng Android dịch Việt ↔ Trung tập trung vào **tốc độ + kiểm tra sát nghĩa bằng dịch ngược**.
 
