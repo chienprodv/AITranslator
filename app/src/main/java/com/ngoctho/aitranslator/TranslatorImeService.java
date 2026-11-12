@@ -667,6 +667,7 @@ public class TranslatorImeService extends InputMethodService {
             tab.setOnClickListener(v->{emojiCategory=category;emojiPage=0;rebuildKeyboard();});
             categories.addView(tab,new LinearLayout.LayoutParams(-2,dp(34)));
         }tabs.addView(categories);keyboardRoot.addView(tabs);
+        tabs.post(()->{View selected=categories.getChildAt(emojiCategory);if(selected!=null)tabs.scrollTo(Math.max(0,selected.getLeft()-dp(12)),0);});
         List<EmojiRepository.Entry> entries=EmojiRepository.category(this,emojiCategory,privateEditor);
         final int pageSize=emojiCategory==12?18:64,columns=emojiCategory==12?3:8;
         int pages=Math.max(1,(entries.size()+pageSize-1)/pageSize);emojiPage=Math.max(0,Math.min(pages-1,emojiPage));
@@ -683,6 +684,7 @@ public class TranslatorImeService extends InputMethodService {
         for (int i=start;i<end;i++) {
             if((i-start)%columns==0){row=new LinearLayout(this);grid.addView(row);}
             final EmojiRepository.Entry entry=entries.get(i);Button key=keyButton(entry.value);
+            if(emojiCategory==12){key.setSingleLine(true);key.setAutoSizeTextTypeUniformWithConfiguration(8,18,1,TypedValue.COMPLEX_UNIT_SP);}
             key.setContentDescription(entry.label+"; giữ để lưu yêu thích");
             key.setOnClickListener(v -> {
                 commit(entry.value);if(!privateEditor)EmojiRepository.recent(this,entry.value);
