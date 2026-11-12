@@ -1,4 +1,6 @@
-# Hồ sơ Google Play — bản chuẩn bị 1.3.0
+# Hồ sơ Google Play — đã dừng
+
+**12/11/2026: Chủ sở hữu hủy kế hoạch đăng Google Play. Không tiếp tục chuẩn bị AAB, hồ sơ hoặc phát hành. Nội dung bên dưới chỉ giữ làm lịch sử. Build hiện tại chỉ tạo APK.**
 
 Người phát triển: Nguyen xuan chien. Ứng dụng: XinayuAITranslator. Email hỗ trợ/quyền riêng tư công khai được chủ sở hữu chọn: langdinhvi011@gmail.com.
 
