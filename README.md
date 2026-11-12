@@ -1,8 +1,8 @@
-# XinayuAITranslator 1.2.1
+# XinayuAITranslator 1.3.0
 
 Copyright by Nguyen xuan chien
 
-Bản 1.2.1: tăng khoảng trống dưới bàn phím, ký tự ba màu và RGB khi chạm. Xem [hướng dẫn bản fix và cài đặt](docs/KEYBOARD_1.2.1.md), [quy trình ký bằng khóa cố định](docs/SIGNING.md).
+Bản 1.3.0: Studio LED với 16 hiệu ứng, nút 💡 chỉnh mode/độ sáng/tốc độ; xem [hướng dẫn LED](docs/LED_1.3.md) và [hồ sơ chuẩn bị CH Play](docs/PLAY_PREPARATION.md). Bản đã ký dùng cùng khóa 1.2.1 để cài đè. Xem [hướng dẫn bản fix và cài đặt](docs/KEYBOARD_1.2.1.md), [quy trình ký bằng khóa cố định](docs/SIGNING.md).
 
 CI hiện tạo APK unsigned; APK cài đặt cần ký bằng khóa riêng đã giữ trên máy. Chữ ký mới từ 1.2.1 không cài đè bản debug 1.2.0 đã mất khóa riêng.
 
