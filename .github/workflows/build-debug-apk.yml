@@ -29,11 +29,15 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Build unsigned debug APK for retained local key
-        run: gradle --no-daemon :app:assembleDebug -PunsignedDebug=true --stacktrace
+      - name: Build APK and Play AAB for retained local signing
+        run: |
+          gradle --no-daemon :app:assembleDebug :app:bundleRelease -PunsignedDebug=true --stacktrace
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug-unsigned.apk dist/BUILD_ONLY_DO_NOT_INSTALL.apk.unsigned
+          cp app/build/outputs/bundle/release/app-release.aab dist/PLAY_UPLOAD_UNSIGNED.aab
 
       - uses: actions/upload-artifact@v4
         with:
-          name: XinayuAITranslator-unsigned-apk
-          path: app/build/outputs/apk/debug/app-debug-unsigned.apk
+          name: BUILD-ONLY-UNSIGNED-NOT-INSTALLABLE
+          path: dist/*
           if-no-files-found: error
