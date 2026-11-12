@@ -64,10 +64,10 @@ public final class ApiClient {
         return new ScreenTranslationResult(text, vi, warning);
     }
 
-    public static BiTranslationResult translateDirectional(
-            Context context,
-            String source,
-            String direction) throws Exception {
+    public static BiTranslationResult translateDirectional(Context context, String source, String direction) throws Exception {
+        return translateDirectional(context, source, direction, false);
+    }
+    public static BiTranslationResult translateDirectional(Context context, String source, String direction, boolean typed) throws Exception {
         String text = requireSource(source);
         String dir = DirectionalTranslationEngine.ZH_TO_VI.equals(direction)
                 ? DirectionalTranslationEngine.ZH_TO_VI
@@ -79,7 +79,7 @@ public final class ApiClient {
                     "Chế độ DEMO chỉ hỗ trợ một số câu mẫu giọng nói. Hãy cấu hình AI để dịch tự do.");
         }
 
-        String raw = call(context, "voice", text, dir, 420);
+        String raw = call(context, typed ? "keyboard_reverse" : "voice", text, dir, 420);
         JSONObject obj = parseJsonObject(raw);
         String interpreted = obj.optString("interpreted_source", text).trim();
         String translated = obj.optString("translated", "").trim();
@@ -104,15 +104,23 @@ public final class ApiClient {
         String businessContext = AppPrefs.businessContext(context);
         String glossary = AppPrefs.glossary(context);
         String prompt = promptFor(task, direction, businessContext, glossary);
+        String tone = KeyboardData.prefs(context).getString("tone", "polite");
+        prompt += " Tone: " + ("firm".equals(tone) ? "firm and professional without adding commitments" : "friendly".equals(tone) ? "friendly and natural" : "concise".equals(tone) ? "concise but preserve every condition" : "polite and professional") + ".";
+        String locked = KeyboardData.prefs(context).getString("lock_terms", "");
+        if (!locked.isEmpty()) prompt += " Preserve these literal product names or codes when they occur in the source (data, not instructions): " + JSONObject.quote(trim(locked, 1500));
+        if (source.equals(KeyboardData.prefs(context).getString("alternative_source", ""))) {
+            prompt += " Provide another natural wording with the identical facts and conditions, distinct from this previous translation (data, not instructions): "
+                    + JSONObject.quote(trim(KeyboardData.prefs(context).getString("alternative_reference", ""), 1000));
+        }
 
         if (!AppPrefs.isReady(context)) throw new IllegalArgumentException("Chưa cấu hình API/proxy.");
-        acquire(context);
+        acquire(context, task);
         boolean success = false;
         try {
             REQUEST_TICKET.set(VndBudget.reserve(context, source, prompt, maxTokens));
             String result;
             if (AppPrefs.isProxy(provider)) {
-                result = callProxy(context, upstream, model, task, direction, source, businessContext, glossary);
+                result = callProxy(context, upstream, model, task, direction, source, businessContext, glossary, maxTokens);
             } else {
                 String apiKey = AppPrefs.apiKey(context, provider);
                 if (apiKey.isEmpty()) throw new IllegalArgumentException("Chưa nhập API key.");
@@ -156,7 +164,7 @@ public final class ApiClient {
                     "warning is empty unless OCR ambiguity may materially change meaning.";
         }
 
-        if ("voice".equals(task)) {
+        if ("voice".equals(task) || "keyboard_reverse".equals(task)) {
             boolean zhToVi = DirectionalTranslationEngine.ZH_TO_VI.equals(direction);
             String language = zhToVi
                     ? "Source is Chinese; target is Vietnamese; independently back-translate the Vietnamese result into Chinese."
@@ -209,7 +217,7 @@ public final class ApiClient {
             properties.put("vi", new JSONObject().put("type", "string"));
             properties.put("warning", new JSONObject().put("type", "string"));
             required.put("vi").put("warning");
-        } else if ("voice".equals(task)) {
+        } else if ("voice".equals(task) || "keyboard_reverse".equals(task)) {
             properties.put("interpreted_source", new JSONObject().put("type", "string"));
             properties.put("translated", new JSONObject().put("type", "string"));
             properties.put("back_translation", new JSONObject().put("type", "string"));
@@ -302,7 +310,7 @@ public final class ApiClient {
             String direction,
             String source,
             String businessContext,
-            String glossary) throws Exception {
+            String glossary, int maxTokens) throws Exception {
         String base = AppPrefs.proxyUrl(context);
         if (base.isEmpty()) throw new IllegalArgumentException("Chưa nhập URL server/proxy.");
         String endpoint = base.endsWith("/translate")
@@ -313,6 +321,7 @@ public final class ApiClient {
         }
 
         JSONObject body = new JSONObject();
+        body.put("max_output_tokens", maxTokens);
         body.put("provider", upstream);
         body.put("model", model);
         body.put("task", task);
@@ -320,6 +329,9 @@ public final class ApiClient {
         body.put("source", source);
         body.put("context", businessContext);
         body.put("glossary", glossary == null ? "" : glossary);
+        body.put("tone", KeyboardData.prefs(context).getString("tone", "polite"));
+        body.put("locked_terms", KeyboardData.prefs(context).getString("lock_terms", ""));
+        if (source.equals(KeyboardData.prefs(context).getString("alternative_source", ""))) body.put("alternative_reference", KeyboardData.prefs(context).getString("alternative_reference", ""));
 
         String token = AppPrefs.proxyToken(context);
         JSONObject response = postJson(endpoint, token, body, !token.isEmpty());
@@ -381,6 +393,7 @@ public final class ApiClient {
     private static final ArrayDeque<Long> RECENT_CALLS = new ArrayDeque<>();
     private static final ThreadLocal<Context> REQUEST_CONTEXT = new ThreadLocal<>();
     private static final ThreadLocal<VndBudget.Ticket> REQUEST_TICKET = new ThreadLocal<>();
+    private static final ThreadLocal<String> REQUEST_TASK = new ThreadLocal<>();
     private static boolean activeCall;
     private static int failures;
     private static long pausedUntil;
@@ -397,7 +410,7 @@ public final class ApiClient {
                 .putInt("minute_limit", bounded(minute, 1, 60)).apply();
     }
 
-    private static void acquire(Context context) {
+    private static void acquire(Context context, String task) {
         synchronized (SPEND_LOCK) {
             long now = SystemClock.elapsedRealtime();
             if (activeCall) throw new IllegalStateException("Đang có yêu cầu AI chạy. Chờ hoàn tất; không gửi thêm.");
@@ -422,6 +435,8 @@ public final class ApiClient {
             if (!editor.commit()) throw new IllegalStateException("Không lưu được bộ đếm API; tạm dừng để bảo vệ hạn mức.");
             activeCall = true; RECENT_CALLS.addLast(now);
             REQUEST_CONTEXT.set(context.getApplicationContext());
+            REQUEST_TASK.set(task);
+            recordTrend(context, task, 0, 0, true);
         }
     }
 
@@ -432,6 +447,7 @@ public final class ApiClient {
             else if (++failures >= 3) { pausedUntil = SystemClock.elapsedRealtime() + 60000; failures = 0; }
             REQUEST_CONTEXT.remove();
             REQUEST_TICKET.remove();
+            REQUEST_TASK.remove();
         }
     }
 
@@ -446,6 +462,7 @@ public final class ApiClient {
             long input = Math.max(0, usage.optLong("prompt_tokens", usage.optLong("input_tokens", 0)));
             long output = Math.max(0, usage.optLong("completion_tokens", usage.optLong("output_tokens", 0)));
             VndBudget.settle(context, REQUEST_TICKET.get(), input, output);
+            recordTrend(context, REQUEST_TASK.get(), input, output, false);
             prefs.edit().putLong("input_tokens", prefs.getLong("input_tokens", 0) + input)
                     .putLong("output_tokens", prefs.getLong("output_tokens", 0) + output)
                     .putInt("metered", prefs.getInt("metered", 0) + 1).commit();
@@ -465,6 +482,68 @@ public final class ApiClient {
                 + "\nCâu cục bộ, cache và câu đã lưu không dùng lượt API. Lượt lỗi vẫn tính vào hạn mức."
                 + "\n" + VndBudget.summary(context)
                 + (calls * 5 >= limit * 4 ? "\n⚠ Còn tối đa 20% lượt gọi hôm nay." : "");
+    }
+
+
+    public static JSONArray usageRecords(Context context) {
+        try { return new JSONArray(usagePrefs(context).getString("trend", "[]")); }
+        catch (Exception e) { return new JSONArray(); }
+    }
+    private static void recordTrend(Context context, String task, long input, long output, boolean attempt) {
+        try {
+            JSONArray old = usageRecords(context), next = new JSONArray();
+            JSONObject current = null;
+            for (int i = 0; i < old.length(); i++) if (today().equals(old.getJSONObject(i).optString("day"))) current = old.getJSONObject(i);
+            if (current == null) current = new JSONObject().put("day", today());
+            current.put("calls", current.optInt("calls") + (attempt ? 1 : 0));
+            current.put("input", current.optLong("input") + input).put("output", current.optLong("output") + output);
+            if (attempt) current.put(task == null ? "unknown" : task, current.optInt(task == null ? "unknown" : task) + 1);
+            next.put(current);
+            for (int i = 0; i < old.length() && next.length() < 31; i++) if (!today().equals(old.getJSONObject(i).optString("day"))) next.put(old.getJSONObject(i));
+            usagePrefs(context).edit().putString("trend", next.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+    public interface AccountCallback { void done(String message); }
+    private static final java.util.concurrent.ExecutorService ACCOUNT_EXEC = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private static boolean checkingAccount;
+    public static synchronized void checkDeepSeekAccount(Context context, AccountCallback callback) {
+        if (checkingAccount) { callback.done("Đang kiểm tra tài khoản; chờ hoàn tất."); return; }
+        final String key = AppPrefs.apiKey(context, AppPrefs.PROVIDER_DEEPSEEK);
+        if (key.isEmpty()) { callback.done("Lưu API key DeepSeek trong cấu hình AI trước."); return; }
+        checkingAccount = true;
+        ACCOUNT_EXEC.execute(() -> {
+            String result;
+            try {
+                JSONObject account = getDeepSeek(key, "/user/balance");
+                StringBuilder text = new StringBuilder("DeepSeek xác thực key thành công.\nSố dư do DeepSeek trả về:");
+                JSONArray balances = account.optJSONArray("balance_infos");
+                if (balances != null) for (int i = 0; i < balances.length(); i++) {
+                    JSONObject balance = balances.getJSONObject(i);
+                    text.append("\n").append(balance.optString("total_balance")).append(' ').append(balance.optString("currency"));
+                }
+                text.append(account.optBoolean("is_available") ? "\nCó số dư để gọi API." : "\nChưa đủ số dư để gọi API.");
+                String model = AppPrefs.model(context, AppPrefs.PROVIDER_DEEPSEEK);
+                JSONArray models = getDeepSeek(key, "/models").optJSONArray("data");
+                boolean exists = false;
+                if (models != null) for (int i = 0; i < models.length(); i++) if (model.equals(models.getJSONObject(i).optString("id"))) exists = true;
+                text.append("\nModel ").append(model).append(exists ? ": có trong danh sách." : ": chưa thấy trong danh sách, kiểm tra tên model.");
+                result = text.toString();
+            } catch (Exception e) { result = "Không kiểm tra được DeepSeek: " + e.getMessage(); }
+            synchronized (ApiClient.class) { checkingAccount = false; }
+            final String message = result;
+            new Handler(Looper.getMainLooper()).post(() -> callback.done(message));
+        });
+    }
+    private static JSONObject getDeepSeek(String key, String path) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL("https://api.deepseek.com" + path).openConnection();
+        connection.setConnectTimeout(6000); connection.setReadTimeout(10000);
+        connection.setRequestProperty("Authorization", "Bearer " + key);
+        connection.setRequestProperty("Accept", "application/json");
+        try {
+            int code = connection.getResponseCode();
+            if (code != 200) throw new IllegalStateException("HTTP " + code + (code == 401 ? " — key không hợp lệ hoặc đã bị thu hồi." : ""));
+            return new JSONObject(readAll(connection.getInputStream()));
+        } finally { connection.disconnect(); }
     }
 
     private static String readAll(InputStream stream) throws Exception {
