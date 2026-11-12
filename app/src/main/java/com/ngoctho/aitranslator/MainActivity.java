@@ -51,6 +51,7 @@ public class MainActivity extends Activity {
         UiInsets.apply(ui);
         setContentView(ui);
         loadSettings();
+        PrivacyConsent.onLaunch(this);
     }
 
     @Override
@@ -73,11 +74,13 @@ public class MainActivity extends Activity {
 
         root.addView(text("XinayuAITranslator", 25, true));
         root.addView(text("Copyright by Nguyen xuan chien", 13, false));
+        Button privacy=button("QUYỀN RIÊNG TƯ / ĐỒNG Ý DỊCH TRỰC TUYẾN");
+        privacy.setOnClickListener(v->PrivacyConsent.show(this));root.addView(privacy);
         Button keyboardSettings = button("BÀN PHÍM: BỐ CỤC, CÂU MẪU, RIÊNG TƯ, SAO LƯU");
         keyboardSettings.setOnClickListener(v -> startActivity(new Intent(this, KeyboardOptionsActivity.class)));
         root.addView(keyboardSettings);
         root.addView(text(
-                "Bản 1.2.1 — màu ký tự 3 vùng, RGB khi bấm phím, khoảng trống dưới bàn phím có thể chỉnh, câu đã lưu, ký hiệu, emoji, micro, dịch hai chiều và hạn mức VNĐ.",
+                "Bản 1.3.0 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
                 14, false));
 
         addSpacer(root, 16);
@@ -314,6 +317,7 @@ public class MainActivity extends Activity {
     }
 
     private void startScreenTranslation() {
+        if(!PrivacyConsent.allowed(this)){PrivacyConsent.show(this);return;}
         saveSettings();
         if (!Settings.canDrawOverlays(this)) {
             pendingScreenStart = true;
@@ -330,6 +334,7 @@ public class MainActivity extends Activity {
     }
 
     private void requestScreenCapture() {
+        if(!PrivacyConsent.allowed(this)){PrivacyConsent.show(this);return;}
         MediaProjectionManager manager =
                 (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
         startActivityForResult(manager.createScreenCaptureIntent(), REQ_SCREEN_CAPTURE);
