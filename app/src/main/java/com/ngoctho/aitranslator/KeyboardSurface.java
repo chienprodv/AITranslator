@@ -30,6 +30,8 @@ public final class KeyboardSurface extends View {
     private KeyboardModel model = new KeyboardModel(0, false);
     private boolean shifted, caps, english, numeric, privateEditor;
     private int symbols, focused = -1;
+    private String enterLabel="↵";
+    public void editorActionLabel(String label){enterLabel=label;invalidate();}
     private double xOffset, widthUnits, rowHeight;
     private String[] variants;
     private int variantPointer = -1, variantIndex;
@@ -76,7 +78,7 @@ public final class KeyboardSurface extends View {
             case "SPACE": return english ? "English" : "Tiếng Việt";
             case "SYMBOLS": return symbols == 0 ? "!#1" : "ABC";
             case "LANGUAGE": return "◎";
-            case "ENTER": return "↵";
+            case "ENTER": return enterLabel;
             default: return shifted && symbols == 0 ? code.toUpperCase(Locale.ROOT) : code;
         }
     }
@@ -87,7 +89,7 @@ public final class KeyboardSurface extends View {
             case "SPACE": return "Dấu cách; giữ và kéo để di chuyển con trỏ";
             case "SYMBOLS": return "Chữ cái và ký hiệu";
             case "LANGUAGE": return "Đổi ngôn ngữ; giữ để chọn bàn phím";
-            case "ENTER": return "Xuống dòng";
+            case "ENTER": return enterLabel.equals("↵")?"Xuống dòng hoặc Enter":enterLabel;
             default: return label(code);
         }
     }
