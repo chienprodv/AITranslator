@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
         keyboardSettings.setOnClickListener(v -> startActivity(new Intent(this, KeyboardOptionsActivity.class)));
         root.addView(keyboardSettings);
         root.addView(text(
-                "Bản 1.4.2 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
+                "Bản 1.5.0 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
                 14, false));
 
         addSpacer(root, 16);
@@ -233,13 +233,13 @@ public class MainActivity extends Activity {
         addSpacer(root, 20);
         root.addView(text("4. Dịch màn hình", 19, true));
         root.addView(text(
-                "Nhấn 译 để dịch đè chữ Trung lên ảnh chụp. Giữ xem gốc, chọn vùng hoặc chạm khối chữ để xem đủ. Đóng ảnh để cuộn trang; chỉ chữ OCR được gửi lên AI.",
+                "Bấm 译 trên bàn phím để dịch toàn màn hình thành trang đọc có thể cuộn. Không cần giữ bong bóng. Android vẫn cần cấp quyền chụp cho mỗi phiên mới.",
                 13, false));
         screenStatus = text("", 13, false);
         root.addView(screenStatus);
 
-        Button startScreen = button("BẬT BONG BÓNG DỊCH MÀN HÌNH");
-        startScreen.setOnClickListener(v -> startScreenTranslation());
+        Button startScreen = button("DỊCH TOÀN MÀN HÌNH");
+        startScreen.setOnClickListener(v -> startActivity(new Intent(this,ScreenCaptureActivity.class)));
         root.addView(startScreen);
 
         Button stopScreen = button("DỪNG DỊCH MÀN HÌNH");
@@ -365,11 +365,11 @@ public class MainActivity extends Activity {
     private void updateScreenStatus() {
         if (screenStatus == null) return;
         if (!Settings.canDrawOverlays(this)) {
-            screenStatus.setText("Trạng thái: chưa cấp quyền bong bóng.");
+            screenStatus.setText("Trạng thái: chưa cấp quyền hiển thị bản dịch.");
         } else if (ScreenTranslateService.running) {
             screenStatus.setText("Trạng thái: "+ScreenTranslateService.lastStatus);
         } else {
-            screenStatus.setText("Trạng thái: đã có quyền bong bóng, dịch màn hình chưa chạy.");
+            screenStatus.setText("Trạng thái: đã có quyền hiển thị bản dịch; bấm 译 trên bàn phím để chụp.");
         }
     }
 
