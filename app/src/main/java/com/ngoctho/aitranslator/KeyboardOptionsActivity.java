@@ -31,7 +31,7 @@ public class KeyboardOptionsActivity extends Activity {
         super.onCreate(state);HighRefresh.request(getWindow());
         ScrollView scroll = new ScrollView(this); root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(24)); scroll.addView(root); UiInsets.apply(scroll); setContentView(scroll);
-        title("XinayuAITranslator 1.4.2");
+        title("XinayuAITranslator 1.5.0");
         text("Copyright by Nguyen xuan chien");
         text("Bố cục theo ảnh Samsung đã cung cấp. Chạm vào bản xem trước để thử vùng phím. LED xem trước tạm dừng khi cuộn để giữ giao diện mượt. Thay đổi áp dụng khi mở lại bàn phím.");
         previewText = text("Xem trước phím vừa bấm: —");
@@ -59,6 +59,12 @@ public class KeyboardOptionsActivity extends Activity {
         choice("Màu ký tự vùng trái", "color_left", colorNames, colorValues, "cyan");
         choice("Màu ký tự vùng giữa", "color_middle", colorNames, colorValues, "purple");
         choice("Màu ký tự vùng phải", "color_right", colorNames, colorValues, "pink");
+        title("Giao diện bàn phím");
+        button("CHỌN ẢNH NỀN",()->{Intent image=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE);try{startActivityForResult(image,803);}catch(Exception e){toast("Không mở được trình chọn ảnh.");}});
+        button("XÓA ẢNH NỀN",()->{KeyboardAppearance.remove(this);refreshPreview();toast("Đã xóa ảnh nền.");});
+        slider("Độ đậm nền (%) · 0 là trong suốt","keyboard_opacity",0,100,100);
+        slider("Độ đậm nền từng phím (%)","key_opacity",0,100,100);
+        text("Chữ vẫn giữ rõ. Ảnh được lưu riêng trong app, không gửi AI và không nằm trong sao lưu JSON. Độ trong suốt hiển thị tùy cửa sổ ứng dụng phía sau.");
         title("Studio LED");
         choice("Hiệu ứng LED", "led_mode",KeyboardLighting.NAMES,KeyboardLighting.MODES,KeyboardData.ledMode(this));
         slider("Độ sáng LED (%)", "led_brightness",0,100,70);
@@ -107,7 +113,7 @@ public class KeyboardOptionsActivity extends Activity {
         number("Tự xóa clipboard ghim sau số giờ", "clip_ttl_hours", 24, 1, 365);
         number("Tự xóa lịch sử sau số ngày (câu yêu thích giữ riêng)", "history_ttl_days", 30, 1, 365);
         button("XÓA CLIPBOARD GHIM", () -> { prefs().edit().remove("clipboard_pins").apply(); toast("Đã xóa clipboard ghim của bàn phím."); });
-        text("Clipboard chỉ được đọc khi bấm Dán hoặc Ghim. Ô mật khẩu và ô được ứng dụng đánh dấu riêng tư không dùng AI/học từ. Tệp sao lưu không chứa API key, token proxy, clipboard hệ thống hoặc bộ đếm tiền.");
+        text("Clipboard tự lưu cục bộ chỉ sau khi bật công tắc trong Bộ nhớ, khi Android cho phép; bỏ qua mục đánh dấu nhạy cảm. Có thể tắt và xóa lịch sử tại Bộ nhớ. Ô mật khẩu và ô được ứng dụng đánh dấu riêng tư không dùng AI/học từ. Tệp sao lưu không chứa API key, token proxy, clipboard hệ thống hoặc bộ đếm tiền.");
         includeClipboard = new CheckBox(this); includeClipboard.setText("Bao gồm clipboard ghim khi xuất/nhập tệp (có thể chứa thông tin riêng)"); root.addView(includeClipboard);
         button("XUẤT SAO LƯU JSON", () -> chooseDocument(true));
         button("NHẬP / GỘP SAO LƯU JSON", () -> chooseDocument(false));
@@ -120,7 +126,7 @@ public class KeyboardOptionsActivity extends Activity {
         for (int i = 0; i < Math.min(14, records.length()); i++) {
             JSONObject item = records.optJSONObject(i); if (item == null) continue;
             breakdown.append(item.optString("day")).append(": bàn phím ").append((item.optInt("vi_zh") + item.optInt("keyboard_reverse")))
-                    .append(", giọng nói ").append(item.optInt("voice")).append(", màn hình ").append(item.optInt("screen_zh_vi")+item.optInt("screen_layout_zh_vi"))
+                    .append(", giọng nói ").append(item.optInt("voice")).append(", màn hình ").append(item.optInt("screen_zh_vi")+item.optInt("screen_layout_zh_vi")+item.optInt("screen_full_zh_vi"))
                     .append(" · token ").append(item.optLong("input") + item.optLong("output")).append('\n');
         }
         text(breakdown.length() == 0 ? "Chưa có dữ liệu API mới để vẽ biểu đồ." : breakdown.toString());
@@ -176,6 +182,7 @@ public class KeyboardOptionsActivity extends Activity {
         super.onActivityResult(request, result, data);
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         try {
+            if(request==803){KeyboardAppearance.choose(this,data.getData(),(image,error)->{if(isDestroyed())return;if(error.isEmpty()){refreshPreview();toast("Đã lưu ảnh nền.");}else toast(error);});return;}
             if (request == 801) {
                 try (OutputStream stream = getContentResolver().openOutputStream(data.getData(), "wt")) {
                     if (stream == null) throw new IOException("Không mở được tệp ghi.");
