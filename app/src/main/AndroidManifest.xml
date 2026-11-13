@@ -32,6 +32,7 @@
         <activity android:name=".TranslatorImeService$AudioPermissionActivity"
             android:exported="false" android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
+        <activity android:name=".ScreenCaptureActivity" android:exported="false" android:taskAffinity="" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity android:name=".KeyboardOptionsActivity" android:exported="false" />
         <activity android:name=".VoiceTranslateActivity" android:exported="false" />
         <activity android:name=".HistoryActivity" android:exported="false" />
