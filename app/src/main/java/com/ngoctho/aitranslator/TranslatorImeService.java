@@ -68,7 +68,7 @@ public class TranslatorImeService extends InputMethodService {
     private void showTranslation(){if(resultScroll==null)return;resultScroll.setVisibility(View.VISIBLE);autoHandler.removeCallbacks(collapseResult);if(lastResult!=null)autoHandler.postDelayed(collapseResult,5000);}
     private void collapseTranslation(){autoHandler.removeCallbacks(collapseResult);collapseResult.run();}
     private void toggleTranslation(){if(resultScroll.getVisibility()==View.VISIBLE)collapseTranslation();else showTranslation();}
-    private void checkEmptyEditor(){InputConnection ic=getCurrentInputConnection();if(ic==null)return;CharSequence before=ic.getTextBeforeCursor(1,0),after=ic.getTextAfterCursor(1,0),selected=ic.getSelectedText(0);
+    private void checkEmptyEditor(){if(resultScroll==null||resultScroll.getVisibility()!=View.VISIBLE)return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;CharSequence before=ic.getTextBeforeCursor(1,0),after=ic.getTextAfterCursor(1,0),selected=ic.getSelectedText(0);
         if(before!=null&&after!=null&&before.length()==0&&after.length()==0&&(selected==null||selected.length()==0)){collapseTranslation();if(lastResult!=null)invalidateTranslation();}}
     @Override public void onCreate(){super.onCreate();clipboardManager=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(clipboardManager!=null)clipboardManager.addPrimaryClipChangedListener(clipboardListener);}
     @Override public void onViewClicked(boolean focusChanged){super.onViewClicked(focusChanged);if(panel!=0&&keyboardRoot!=null)openPanel(0);}
@@ -536,7 +536,7 @@ public class TranslatorImeService extends InputMethodService {
     @Override public void onUpdateSelection(int oldStart, int oldEnd, int start, int end,
             int candidatesStart, int candidatesEnd) {
         super.onUpdateSelection(oldStart, oldEnd, start, end, candidatesStart, candidatesEnd);
-        checkEmptyEditor();
+        if(start==0&&end==0)checkEmptyEditor();
         if(panel!=0&&keyboardRoot!=null&&(oldStart!=start||oldEnd!=end)&&android.os.SystemClock.uptimeMillis()>ignoreSelectionUntil)openPanel(0);
         if (translatedDraft != null && !translatedDraft.matches(getCurrentInputConnection())) invalidateTranslation();
     }
