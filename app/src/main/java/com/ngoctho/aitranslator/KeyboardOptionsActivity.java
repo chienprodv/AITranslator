@@ -31,7 +31,7 @@ public class KeyboardOptionsActivity extends Activity {
         super.onCreate(state);HighRefresh.request(getWindow());
         ScrollView scroll = new ScrollView(this); root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(24)); scroll.addView(root); UiInsets.apply(scroll); setContentView(scroll);
-        title("XinayuAITranslator 1.5.0");
+        title("XinayuAITranslator 1.5.1");
         text("Copyright by Nguyen xuan chien");
         text("Bố cục theo ảnh Samsung đã cung cấp. Chạm vào bản xem trước để thử vùng phím. LED xem trước tạm dừng khi cuộn để giữ giao diện mượt. Thay đổi áp dụng khi mở lại bàn phím.");
         previewText = text("Xem trước phím vừa bấm: —");
