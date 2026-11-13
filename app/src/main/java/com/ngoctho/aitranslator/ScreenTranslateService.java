@@ -77,7 +77,7 @@ public class ScreenTranslateService extends Service {
     private TextView layoutStatus;
     private boolean selectNext;
     private boolean active(long token){return !destroyed && token==generation;}
-    private void closeLayout(){generation++;busy=false;hideResult();hideSelection();frozen=null;stage("Sẵn sàng · nhấn 译");if(bubbleView!=null)bubbleView.setVisibility(View.VISIBLE);}
+    private void closeLayout(){TranslationBubbleService.restore();generation++;busy=false;hideResult();hideSelection();frozen=null;stage("Sẵn sàng · nhấn 译");if(bubbleView!=null)bubbleView.setVisibility(View.VISIBLE);}
 
 
     @Override
@@ -268,6 +268,7 @@ public class ScreenTranslateService extends Service {
     private void captureForRegionSelection() {
         if(busy){feedback("Đang xử lý. Bấm Đóng trên ảnh để hủy trước khi dịch lại.");return;}
         if(imageReader==null||mediaProjection==null){feedback("Phiên chụp đã dừng. Mở ứng dụng, tắt rồi bật lại dịch màn hình.");return;}
+        TranslationBubbleService.hideForCapture();
         busy=true;final long token=++generation;hideResult();hideSelection();frozen=null;
         stage("Đang chụp màn hình…");
         if(bubbleView!=null)bubbleView.setVisibility(View.INVISIBLE);
@@ -351,6 +352,7 @@ public class ScreenTranslateService extends Service {
     }
 
     private void finishBusyWithError(String message) {
+        TranslationBubbleService.restore();
         stage(message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();
         busy = false;
         hideSelection();
@@ -505,6 +507,7 @@ public class ScreenTranslateService extends Service {
 
     @Override
     public void onDestroy() {
+        TranslationBubbleService.restore();
         destroyed=true;generation++;main.removeCallbacksAndMessages(null);
         running = false;lastStatus="Đã dừng";
         hideResult();
