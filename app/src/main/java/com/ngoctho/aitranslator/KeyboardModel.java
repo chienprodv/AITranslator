@@ -32,10 +32,10 @@ public final class KeyboardModel {
         row(symbols == 0 ? "qwertyuiop" : symbols == 1 ? "+×÷=/_<>[]" : "€£¥₫¢^°•≈≠", 1, 0, 1);
         row(symbols == 0 ? "asdfghjkl" : symbols == 1 ? "!@#$%&*()" : "{}\\|~`§©®", 2, 0.5, 1);
         add("SHIFT", 0, 3, 1.5);
-        row(symbols == 0 ? "zxcvbnm" : symbols == 1 ? "-\"':;?~" : "±√∞«»…·", 3, 1.5, 1);
+        row(symbols == 0 ? "zxcvbnm" : symbols == 1 ? "-\"':;~?" : "±√∞«»…·", 3, 1.5, 1);
         add("DELETE", 8.5, 3, 1.5);
-        add("SYMBOLS", 0, 4, 1.25); add("LANGUAGE", 1.25, 4, 0.9); add("?", 2.15, 4, 0.9);
-        add("SPACE", 3.05, 4, 4.1); add(".", 7.15, 4, 0.9); add("ENTER", 8.05, 4, 1.95);
+        add("SYMBOLS", 0, 4, 1.25); add("LANGUAGE", 1.25, 4, 0.9); add(".", 2.15, 4, 0.9);
+        add("SPACE", 3.05, 4, 4.1); add(",", 7.15, 4, 0.9); add("ENTER", 8.05, 4, 1.95);
     }
     private void row(String value, int y, double x, double width) {
         for (int i = 0; i < value.length(); i++) add(value.substring(i, i + 1), x + i * width, y, width);
