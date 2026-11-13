@@ -30,7 +30,7 @@ public final class KeyboardSurface extends View {
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener styleListener=(prefs,key)->{
         if(key==null||STYLE_KEYS.contains(key))reloadStyle();
     };
-    private static final Set<String> STYLE_KEYS=new HashSet<>(Arrays.asList("key_height","key_font","one_hand","theme","led_mode","rgb_press","led_brightness","led_speed","led_reverse","three_colors","color_left","color_middle","color_right","led_color","haptic","key_sound","swipe"));
+    private static final Set<String> STYLE_KEYS=new HashSet<>(Arrays.asList("wallpaper_revision","keyboard_opacity","key_opacity","key_height","key_font","one_hand","theme","led_mode","rgb_press","led_brightness","led_speed","led_reverse","three_colors","color_left","color_middle","color_right","led_color","haptic","key_sound","swipe"));
     private android.content.SharedPreferences settings;
     private final Typeface keyTypeface=Typeface.create("sans-serif",Typeface.NORMAL);
     private final List<KeyVisual> visuals=new ArrayList<>();
@@ -55,6 +55,8 @@ public final class KeyboardSurface extends View {
         heightDp=Math.max(38,Math.min(62,settings.getInt("key_height",48)));hand=settings.getString("one_hand","off");fontScale=Math.max(.8f,Math.min(1.25f,settings.getInt("key_font",100)/100f));
         haptic=settings.getBoolean("haptic",true);sound=settings.getBoolean("key_sound",false);swipe=settings.getBoolean("swipe",false);
         if(previousHeight!=heightDp||!previousHand.equals(hand))requestLayout();
+        keyboardOpacity=KeyboardAppearance.opacity(getContext(),"keyboard_opacity");keyOpacity=KeyboardAppearance.opacity(getContext(),"key_opacity");
+        long rev=settings.getLong("wallpaper_revision",0);if(wallpaperRevision!=rev){wallpaperRevision=rev;long token=++wallpaperLoad;KeyboardAppearance.load(getContext(),(image,error)->{if(token!=wallpaperLoad)return;wallpaper=image;fitWallpaper();invalidate();});}
         rebuildVisuals();invalidate();
     }
     private void rebuildVisuals(){
@@ -66,6 +68,10 @@ public final class KeyboardSurface extends View {
             v.baseline=v.bounds.centerY()-(paint.ascent()+paint.descent())/2;visuals.add(v);
         }
     }
+    private Bitmap wallpaper;private final RectF wallpaperTarget=new RectF();private final Paint wallpaperPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+    private long wallpaperRevision=Long.MIN_VALUE,wallpaperLoad;private int keyboardOpacity=100,keyOpacity=100;
+    private void fitWallpaper(){if(wallpaper==null||getWidth()==0||getHeight()==0)return;float scale=Math.max(getWidth()/(float)wallpaper.getWidth(),getHeight()/(float)wallpaper.getHeight()),w=wallpaper.getWidth()*scale,h=wallpaper.getHeight()*scale;wallpaperTarget.set((getWidth()-w)/2,(getHeight()-h)/2,(getWidth()+w)/2,(getHeight()+h)/2);}
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){super.onSizeChanged(w,h,oldw,oldh);fitWallpaper();}
     private boolean effectsPaused;
     private KeyboardModel model = new KeyboardModel(0, false);
     private boolean shifted, caps, english, numeric, privateEditor;
@@ -138,15 +144,16 @@ public final class KeyboardSurface extends View {
         for(int i=pulses.size()-1;i>=0;i--)if(now-pulses.get(i).time>3600)pulses.remove(i);
         boolean animate=animations&&brightness>0&&(KeyboardLighting.continuous(mode)||((mode.equals("reactive")||mode.equals("ripple"))&&!pulses.isEmpty()));
         pressedCodes.clear();for(Press press:presses.values())if(press.current!=null)pressedCodes.add(press.current.code);
-        canvas.drawColor(dark ? 0xff202124 : 0xffe4e5e7);
+        canvas.drawColor((keyboardOpacity*255/100<<24)|((dark?0xff202124:0xffe4e5e7)&0xffffff));
+        if(wallpaper!=null&&!wallpaper.isRecycled()){wallpaperPaint.setAlpha(keyboardOpacity*255/100);canvas.drawBitmap(wallpaper,null,wallpaperTarget,wallpaperPaint);}
         for(KeyVisual visual:visuals){
             KeyboardModel.Key key=visual.key;RectF bounds=visual.bounds;boolean pressed=pressedCodes.contains(key.code);
             KeyboardLighting.sample(lighting,mode,now,key.cx(),key.cy(),dark,brightness,speed,reverse,solid,zoneColors,pulses);
             float flash=lighting.level;int light=lighting.color;
             int background=pressed?(dark?0xff64748b:0xffb9d5ff):visual.special?(dark?0xff484b50:0xffc9ccd0):dark?0xff35373c:0xffffffff;
             // A small offset shadow and layered translucent strokes avoid CPU blur/bitmap uploads.
-            paint.setColor(0x28000000);canvas.drawRoundRect(bounds.left,bounds.top+dp(1),bounds.right,bounds.bottom+dp(1),dp(6),dp(6),paint);
-            paint.setColor(KeyboardLighting.blend(background,light,flash*(dark?.18f:.09f)));canvas.drawRoundRect(bounds,dp(6),dp(6),paint);
+            paint.setColor((40*keyOpacity/100)<<24);canvas.drawRoundRect(bounds.left,bounds.top+dp(1),bounds.right,bounds.bottom+dp(1),dp(6),dp(6),paint);
+            paint.setColor((keyOpacity*255/100<<24)|(KeyboardLighting.blend(background,light,flash*(dark?.18f:.09f))&0xffffff));canvas.drawRoundRect(bounds,dp(6),dp(6),paint);
             if(flash>0){paint.setStyle(Paint.Style.STROKE);
                 paint.setColor((Math.round(30*flash)<<24)|(light&0xffffff));paint.setStrokeWidth(dp(6));canvas.drawRoundRect(bounds,dp(6),dp(6),paint);
                 paint.setColor((Math.round(70*flash)<<24)|(light&0xffffff));paint.setStrokeWidth(dp(3));canvas.drawRoundRect(bounds,dp(6),dp(6),paint);
