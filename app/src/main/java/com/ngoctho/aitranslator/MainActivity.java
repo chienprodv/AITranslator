@@ -41,6 +41,7 @@ public class MainActivity extends Activity {
     private TextView testOutput;
     private TextView configHint;
     private TextView screenStatus;
+    private CheckBox keepBubble;
     private boolean pendingScreenStart;
     private TextView usageView;
 
@@ -57,6 +58,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if(keepBubble!=null)keepBubble.setChecked(KeyboardData.prefs(this).getBoolean("screen_keep_bubble",true));
+        try{TranslationBubbleService.start(this);}catch(Exception ignored){}
         updateScreenStatus();
         if (usageView != null) usageView.setText(ApiClient.usageSummary(this));
         if (pendingScreenStart && Settings.canDrawOverlays(this)) {
@@ -80,7 +83,7 @@ public class MainActivity extends Activity {
         keyboardSettings.setOnClickListener(v -> startActivity(new Intent(this, KeyboardOptionsActivity.class)));
         root.addView(keyboardSettings);
         root.addView(text(
-                "Bản 1.5.0 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
+                "Bản 1.5.1 — Studio LED với 16 hiệu ứng, độ sáng và tốc độ; dịch Việt ↔ Trung, mic, emoji, câu đã lưu và hạn mức VNĐ. Giữ 💡 trên bàn phím để đổi hiệu ứng nhanh.",
                 14, false));
 
         addSpacer(root, 16);
@@ -233,7 +236,7 @@ public class MainActivity extends Activity {
         addSpacer(root, 20);
         root.addView(text("4. Dịch màn hình", 19, true));
         root.addView(text(
-                "Bấm 译 trên bàn phím để dịch toàn màn hình thành trang đọc có thể cuộn. Không cần giữ bong bóng. Android vẫn cần cấp quyền chụp cho mỗi phiên mới.",
+                "Dùng ô 译 trong thanh cài đặt nhanh, bong bóng hoặc nút trên bàn phím. Bong bóng chạy độc lập với phiên chụp; Android vẫn cần cấp quyền khi phiên chụp đã dừng.",
                 13, false));
         screenStatus = text("", 13, false);
         root.addView(screenStatus);
@@ -241,6 +244,13 @@ public class MainActivity extends Activity {
         Button startScreen = button("DỊCH TOÀN MÀN HÌNH");
         startScreen.setOnClickListener(v -> startActivity(new Intent(this,ScreenCaptureActivity.class)));
         root.addView(startScreen);
+
+        keepBubble=new CheckBox(this);keepBubble.setText("Giữ bong bóng 译 khi đóng bàn phím");keepBubble.setChecked(KeyboardData.prefs(this).getBoolean("screen_keep_bubble",true));
+        keepBubble.setOnCheckedChangeListener((v,on)->{KeyboardData.prefs(this).edit().putBoolean("screen_keep_bubble",on).apply();if(!on)stopService(new Intent(this,TranslationBubbleService.class));else if(Settings.canDrawOverlays(this)){try{TranslationBubbleService.start(this);}catch(Exception e){Toast.makeText(this,"Hãy mở lại app để bật bong bóng.",Toast.LENGTH_SHORT).show();}}else startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));});root.addView(keepBubble);
+        Button quick=button("THÊM Ô 译 VÀO THANH CÀI ĐẶT NHANH");quick.setOnClickListener(v->{
+            if(Build.VERSION.SDK_INT>=33){android.app.StatusBarManager bar=getSystemService(android.app.StatusBarManager.class);if(bar!=null)bar.requestAddTileService(new android.content.ComponentName(this,ScreenTileService.class),"译 Dịch màn hình",android.graphics.drawable.Icon.createWithResource(this,android.R.drawable.ic_menu_view),getMainExecutor(),result->Toast.makeText(this,result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED?"Đã có ô 译 trong cài đặt nhanh.":"Chưa thêm ô. Mở sửa thanh cài đặt nhanh để thêm 译.",Toast.LENGTH_LONG).show());}
+            else Toast.makeText(this,"Kéo thanh trên xuống hai lần → Sửa các ô → kéo 译 Dịch màn hình vào.",Toast.LENGTH_LONG).show();
+        });root.addView(quick);
 
         Button stopScreen = button("DỪNG DỊCH MÀN HÌNH");
         stopScreen.setOnClickListener(v -> {
