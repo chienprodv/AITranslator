@@ -59,6 +59,23 @@ public class TranslatorImeService extends InputMethodService {
     private Button insertButton;
     private Button autoButton;
     private ScrollView resultScroll;
+    private long ignoreSelectionUntil;
+    private ClipboardManager clipboardManager;
+    private final ClipboardManager.OnPrimaryClipChangedListener clipboardListener=()->{
+        ClipboardMemory.changed(this,this.privateEditor);if(this.panel==4&&keyboardRoot!=null&&isInputViewShown())rebuildKeyboard();
+    };
+    private final Runnable collapseResult=()->{if(resultScroll!=null)resultScroll.setVisibility(View.GONE);};
+    private void showTranslation(){if(resultScroll==null)return;resultScroll.setVisibility(View.VISIBLE);autoHandler.removeCallbacks(collapseResult);if(lastResult!=null)autoHandler.postDelayed(collapseResult,5000);}
+    private void collapseTranslation(){autoHandler.removeCallbacks(collapseResult);collapseResult.run();}
+    private void toggleTranslation(){if(resultScroll.getVisibility()==View.VISIBLE)collapseTranslation();else showTranslation();}
+    private void checkEmptyEditor(){InputConnection ic=getCurrentInputConnection();if(ic==null)return;CharSequence before=ic.getTextBeforeCursor(1,0),after=ic.getTextAfterCursor(1,0),selected=ic.getSelectedText(0);
+        if(before!=null&&after!=null&&before.length()==0&&after.length()==0&&(selected==null||selected.length()==0)){collapseTranslation();if(lastResult!=null)invalidateTranslation();}}
+    @Override public void onCreate(){super.onCreate();clipboardManager=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(clipboardManager!=null)clipboardManager.addPrimaryClipChangedListener(clipboardListener);}
+    @Override public void onViewClicked(boolean focusChanged){super.onViewClicked(focusChanged);if(panel!=0&&keyboardRoot!=null)openPanel(0);}
+    private void screenTranslate(){if(privateEditor){toast("Ô riêng tư không bật dịch màn hình.");return;}if(!PrivacyConsent.allowed(this)){startActivity(new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));toast("Đồng ý xử lý dữ liệu trong app trước.");return;}
+        requestHideSelf(0);if(ScreenTranslateService.running){Intent request=new Intent(this,ScreenTranslateService.class).setAction(ScreenTranslateService.ACTION_TRANSLATE);startService(request);}
+        else startActivity(new Intent(this,ScreenCaptureActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
+
     private long revision;
     private Draft translatedDraft;
     private KeyboardSurface surface;
@@ -107,7 +124,8 @@ public class TranslatorImeService extends InputMethodService {
 
         keyboardRoot = new LinearLayout(this);
         keyboardRoot.setOrientation(LinearLayout.VERTICAL);
-        keyboardRoot.setBackgroundColor(0xffe4e5e7);
+        keyboardRoot.setBackgroundColor((KeyboardAppearance.opacity(this,"keyboard_opacity")*255/100<<24)|0x00e4e5e7);
+        if(getWindow()!=null&&getWindow().getWindow()!=null)getWindow().getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
         keyboardRoot.setPadding(dp(4), dp(3), dp(4), dp(28) + bottomGap());
         keyboardRoot.setOnApplyWindowInsetsListener((v, insets) -> {
             int bottom = Build.VERSION.SDK_INT >= 30
@@ -122,7 +140,7 @@ public class TranslatorImeService extends InputMethodService {
 
         status = new TextView(this);
         status.setText("VI → 中文  ▾");
-        status.setOnClickListener(v -> resultScroll.setVisibility(resultScroll.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        status.setOnClickListener(v -> toggleTranslation());
         status.setContentDescription("Mở hoặc thu gọn bản dịch");
         status.setTextSize(13);
         status.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -178,25 +196,13 @@ public class TranslatorImeService extends InputMethodService {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button translate = actionButton("DỊCH");
-        translateButton = translate;
-        translate.setOnClickListener(v -> translateCurrent(false));
-        actions.addView(translate, weighted(1f, 36));
-
-        insertButton = actionButton("CHÈN 中文");
-        insertButton.setEnabled(false);
-        insertButton.setOnClickListener(v -> insertTranslation());
-        actions.addView(insertButton, weighted(1.4f, 36));
-
-        microphoneButton = smallButton("🎤"); microphoneButton.setContentDescription("Nói; giữ để đổi chiều dịch");
-        microphoneButton.setOnClickListener(v -> toggleVoice());
-        microphoneButton.setOnLongClickListener(v -> { setDirection(!reverse); return true; });
-        actions.addView(microphoneButton, weighted(0.8f, 36));
-        addTool(actions, "☰", "Câu đã lưu và câu mẫu", () -> { panel = panel == 1 ? 0 : 1; rebuildKeyboard(); });
-        addTool(actions, "😊", "Emoji", () -> { panel = panel == 2 ? 0 : 2; rebuildKeyboard(); });
-        Button led=addTool(actions,"💡","Studio LED: chế độ, độ sáng và tốc độ",()->openPanel(panel==6?0:6));
-        led.setOnLongClickListener(v->{cycleLed();return true;});
-        addTool(actions, "⋯", "Sửa chữ, dịch và cài đặt", () -> { panel = panel == 3 ? 0 : 3; rebuildKeyboard(); });
+        Button translate=toolbarKey(actions,"DỊCH","Dịch câu đang gõ",1.25f,()->translateCurrent(false));translateButton=translate;
+        insertButton=toolbarKey(actions,"CHÈN","Chèn bản dịch vào ô chat",1.25f,this::insertTranslation);insertButton.setEnabled(false);
+        toolbarKey(actions,"译","Dịch toàn màn hình",1,this::screenTranslate);
+        microphoneButton=toolbarKey(actions,"🎤","Nói; giữ để đổi chiều dịch",1,this::toggleVoice);microphoneButton.setOnLongClickListener(v->{setDirection(!reverse);return true;});
+        toolbarKey(actions,"😊","Emoji",1,()->openPanel(panel==2?0:2));
+        toolbarKey(actions,"📋","Bộ nhớ sao chép",1,()->openPanel(panel==4?0:4));
+        toolbarKey(actions,"⋯","Câu đã lưu, LED và cài đặt",1,()->openPanel(panel==3?0:3));
 
         keyboardRoot.addView(actions);
         buildKeys();
@@ -301,7 +307,7 @@ public class TranslatorImeService extends InputMethodService {
         final TranslationResult previousOption = secondOption ? lastResult : null;
         invalidateTranslation();
         final long requestRevision = revision;
-        if (!automatic) resultScroll.setVisibility(View.VISIBLE);
+        if (!automatic) showTranslation();
 
         if (!automatic) {
             autoHandler.removeCallbacks(autoTranslateRunnable);
@@ -325,7 +331,7 @@ public class TranslatorImeService extends InputMethodService {
                                 || !requestedDraft.matches(getCurrentInputConnection())) return;
                         translatedDraft = requestedDraft;
                         insertOnly = false;
-                        insertButton.setText("CHÈN 中文");
+                        insertButton.setText("CHÈN");
 
                         lastResult = r;
                         optionsDraft = requestedDraft;
@@ -349,7 +355,7 @@ public class TranslatorImeService extends InputMethodService {
                                         : "VI → 中文 · đã kiểm tra dịch ngược");
 
                         insertButton.setEnabled(!r.chinese.isEmpty());
-                        resultScroll.setVisibility(View.VISIBLE);
+                        showTranslation();
                         status.setText("Xem trước → CHÈN 中文");
                     }
 
@@ -434,6 +440,7 @@ public class TranslatorImeService extends InputMethodService {
     }
 
     private void commit(String s) {
+        ignoreSelectionUntil=android.os.SystemClock.uptimeMillis()+500;
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
             stopVoice();
@@ -464,7 +471,7 @@ public class TranslatorImeService extends InputMethodService {
                     ic.deleteSurroundingText(before.length() - Math.max(0, boundary), 0);
                 }
             }
-            updateCandidates(); scheduleAutoTranslate();
+            updateCandidates(); scheduleAutoTranslate();checkEmptyEditor();
         }
     }
 
@@ -500,6 +507,7 @@ public class TranslatorImeService extends InputMethodService {
         reverse = KeyboardData.prefs(this).getBoolean("reverse", false); voiceLanguage = reverse ? "zh-CN" : "vi-VN";
         KeyboardData.prefs(this).edit().remove("alternative_source").remove("alternative_reference").apply();
         autoEnabled = autoEnabled && !privateEditor;
+        ClipboardMemory.capture(this,privateEditor);
         english = getSharedPreferences("keyboard_ui", MODE_PRIVATE).getBoolean("english", false);
         panel = 0; symbolPage = 0; capsLock = false;
         shifted = false;
@@ -509,7 +517,7 @@ public class TranslatorImeService extends InputMethodService {
             status.setText(privateEditor ? "Riêng tư · AI tắt" : directionLabel());
             autoButton.setEnabled(!privateEditor);
             translateButton.setEnabled(!privateEditor); microphoneButton.setEnabled(!privateEditor);
-            keyboardRoot.setBackgroundColor(isDark() ? 0xff202124 : 0xffe4e5e7);
+            keyboardRoot.setBackgroundColor((KeyboardAppearance.opacity(this,"keyboard_opacity")*255/100<<24)|((isDark()?0xff202124:0xffe4e5e7)&0xffffff));
             LinearLayout toolbar = (LinearLayout) keyboardRoot.getChildAt(2);
             for (int i = 0; i < toolbar.getChildCount(); i++) {
                 View child = toolbar.getChildAt(i);
@@ -528,13 +536,15 @@ public class TranslatorImeService extends InputMethodService {
     @Override public void onUpdateSelection(int oldStart, int oldEnd, int start, int end,
             int candidatesStart, int candidatesEnd) {
         super.onUpdateSelection(oldStart, oldEnd, start, end, candidatesStart, candidatesEnd);
+        checkEmptyEditor();
+        if(panel!=0&&keyboardRoot!=null&&(oldStart!=start||oldEnd!=end)&&android.os.SystemClock.uptimeMillis()>ignoreSelectionUntil)openPanel(0);
         if (translatedDraft != null && !translatedDraft.matches(getCurrentInputConnection())) invalidateTranslation();
     }
 
     @Override
     public void onFinishInputView(boolean finishingInput) {
         if(surface!=null)surface.pauseEffects();
-        autoHandler.removeCallbacks(autoTranslateRunnable);
+        collapseTranslation();autoHandler.removeCallbacks(autoTranslateRunnable);
         invalidateTranslation();
         stopVoice(); TelexComposer.reset(); readRequested = false; if (tts != null) tts.stop();
         autoHandler.removeCallbacks(deleteRepeat);
@@ -596,6 +606,7 @@ public class TranslatorImeService extends InputMethodService {
     }
 
 
+    private Button toolbarKey(LinearLayout row,String label,String description,float weight,Runnable action){Button button=actionButton(label);button.setSingleLine(true);button.setAutoSizeTextTypeUniformWithConfiguration(8,label.length()>3?11:18,1,TypedValue.COMPLEX_UNIT_SP);button.setContentDescription(description);button.setOnClickListener(v->action.run());row.addView(button,weighted(weight,40));return button;}
     private Button addTool(LinearLayout row, String label, String description, Runnable action) {
         Button button = smallButton(label);
         button.setContentDescription(description);
@@ -647,7 +658,7 @@ public class TranslatorImeService extends InputMethodService {
                 intentView.setText("Câu gốc: " + source); chineseView.setText("Bản dịch: " + target);
                 backView.setText("Dịch ngược: " + back); status.setText("Câu đã lưu · CHÈN để dùng lại");
                 insertButton.setText("CHÈN"); insertButton.setEnabled(translatedDraft != null);
-                resultScroll.setVisibility(View.VISIBLE); panel = 0; rebuildKeyboard();
+                showTranslation(); panel = 0; rebuildKeyboard();
             });
             entry.setOnLongClickListener(v -> {
                 if (savedOnly) { HistoryStore.removePhrase(this, source, target); toast("Đã bỏ lưu câu."); rebuildKeyboard(); }
@@ -664,7 +675,7 @@ public class TranslatorImeService extends InputMethodService {
     }
 
     private void showEmojiPanel() {
-        android.widget.HorizontalScrollView tabs=new android.widget.HorizontalScrollView(this);
+        android.widget.HorizontalScrollView tabs=new android.widget.HorizontalScrollView(this);tabs.setHorizontalScrollBarEnabled(false);tabs.setOverScrollMode(View.OVER_SCROLL_NEVER);
         LinearLayout categories=new LinearLayout(this);
         for(int i=0;i<EmojiRepository.CATEGORIES.length;i++){
             final int category = i;
@@ -723,7 +734,7 @@ public class TranslatorImeService extends InputMethodService {
         final long session = voiceSession;
         final Draft draft = Draft.read(getCurrentInputConnection());
         if (draft == null) return;
-        listening = true; microphoneButton.setText("■ Dừng"); resultScroll.setVisibility(View.VISIBLE);
+        listening = true; microphoneButton.setText("■ Dừng"); showTranslation();
         status.setText("Đang nghe " + (voiceLanguage.equals("vi-VN") ? "tiếng Việt" : "tiếng Trung") + "…");
         backView.setText("Chỉ dịch sau khi nói xong; bấm ■ để kết thúc.");
         recognizer = SpeechRecognizer.createSpeechRecognizer(this);
@@ -787,7 +798,7 @@ public class TranslatorImeService extends InputMethodService {
         }
     }
 
-    @Override public void onDestroy() { if (tts != null) { tts.stop(); tts.shutdown(); } stopVoice(); autoHandler.removeCallbacksAndMessages(null); super.onDestroy(); }
+    @Override public void onDestroy() { if(clipboardManager!=null)clipboardManager.removePrimaryClipChangedListener(clipboardListener); if (tts != null) { tts.stop(); tts.shutdown(); } stopVoice(); autoHandler.removeCallbacksAndMessages(null); super.onDestroy(); }
 
     private boolean isDark() {
         String theme = KeyboardData.prefs(this).getString("theme", "system");
@@ -916,7 +927,7 @@ public class TranslatorImeService extends InputMethodService {
         if (draft.source.length() > 500) { toast("Chọn đoạn tối đa 500 ký tự."); return; }
         final boolean second = alternateNext; alternateNext = false;
         final TranslationResult previous = second ? lastResult : null;
-        invalidateTranslation(); final long request = revision; resultScroll.setVisibility(View.VISIBLE); status.setText("Đang dịch " + directionLabel() + "…");
+        invalidateTranslation(); final long request = revision; showTranslation(); status.setText("Đang dịch " + directionLabel() + "…");
         DirectionalTranslationEngine.translate(this, draft.source, reverse ? DirectionalTranslationEngine.ZH_TO_VI : DirectionalTranslationEngine.VI_TO_ZH,
                 !fromVoice, new DirectionalTranslationEngine.Callback() {
             public void onSuccess(BiTranslationResult result, boolean cached) {
@@ -934,7 +945,7 @@ public class TranslatorImeService extends InputMethodService {
         translatedDraft = draft; lastResult = result; insertOnly = append;
         intentView.setText(highlight("Câu gốc: " + result.source)); chineseView.setText(highlight("Bản dịch: " + result.chinese));
         backView.setText("Dịch ngược: " + result.backVi + (result.warning.isEmpty() ? "" : "\n⚠ " + result.warning));
-        status.setText("Xem trước → CHÈN · chưa gửi"); insertButton.setText("CHÈN"); insertButton.setEnabled(!privateEditor && draft != null); resultScroll.setVisibility(View.VISIBLE);
+        status.setText("Xem trước → CHÈN · chưa gửi"); insertButton.setText("CHÈN"); insertButton.setEnabled(!privateEditor && draft != null); showTranslation();
     }
     private void alternate() {
         if (privateEditor || lastResult == null || translatedDraft == null || !translatedDraft.matches(getCurrentInputConnection())) { toast("Dịch câu hiện tại trước để tạo phương án 2."); return; }
@@ -998,12 +1009,14 @@ public class TranslatorImeService extends InputMethodService {
         LinearLayout list = vertical();
         panelAction(list, "ABC · Trở về phím", () -> openPanel(0));
         panelAction(list, "💡 Studio LED · nhiều hiệu ứng, sáng và tốc độ", () -> openPanel(6));
+        panelAction(list,"☰ Câu dịch đã lưu / lịch sử",()->openPanel(1));
+        panelAction(list,"译 Dịch toàn màn hình",this::screenTranslate);
         panelAction(list, directionLabel() + " · đổi chiều dịch", () -> setDirection(!reverse));
         panelAction(list, autoEnabled ? "AUTO đang bật · tắt" : "AUTO đang tắt · bật", () -> {
             if (privateEditor) { toast("Ô riêng tư không dùng AI."); return; }
             autoEnabled = !autoEnabled; AppPrefs.setAutoTranslate(this, autoEnabled); rebuildKeyboard();
         });
-        panelAction(list, "Mở / thu gọn bản dịch", () -> resultScroll.setVisibility(resultScroll.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        panelAction(list, "Mở / thu gọn bản dịch", this::toggleTranslation);
         panelAction(list, "☆ Lưu câu đang xem", this::saveCurrentPhrase); panelAction(list, "🔊 Đọc bản dịch", this::readResult);
         panelAction(list, "Tạo phương án dịch 2 (có thể tính phí API)", this::alternate);
         LinearLayout choices = new LinearLayout(this); addTool(choices, "Chọn PA 1", "Phương án 1", () -> chooseOption(false)); addTool(choices, "Chọn PA 2", "Phương án 2", () -> chooseOption(true)); list.addView(choices);
@@ -1017,7 +1030,7 @@ public class TranslatorImeService extends InputMethodService {
         });
         LinearLayout moves = new LinearLayout(this); addTool(moves, "←", "Con trỏ trái", () -> moveCursor(-1)); addTool(moves, selecting ? "Chọn ✓" : "Chọn", "Chọn văn bản", () -> { selecting = !selecting; rebuildKeyboard(); }); addTool(moves, "→", "Con trỏ phải", () -> moveCursor(1)); addTool(moves, "↶", "Hoàn tác", this::undo); list.addView(moves);
         LinearLayout clip = new LinearLayout(this); addTool(clip, "Tất cả", "Chọn tất cả", () -> editAction(android.R.id.selectAll)); addTool(clip, "Copy", "Sao chép", () -> editAction(android.R.id.copy)); addTool(clip, "Cắt", "Cắt", () -> editAction(android.R.id.cut)); addTool(clip, "Dán", "Dán", () -> editAction(android.R.id.paste)); list.addView(clip);
-        panelAction(list, "Clipboard ghim", () -> openPanel(4)); panelAction(list, "Câu mẫu có ô điền", () -> openPanel(5)); panelAction(list, "Chọn ô [ ] tiếp theo", this::selectPlaceholder);
+        panelAction(list, "📋 Bộ nhớ sao chép", () -> openPanel(4)); panelAction(list, "Câu mẫu có ô điền", () -> openPanel(5)); panelAction(list, "Chọn ô [ ] tiếp theo", this::selectPlaceholder);
         panelAction(list, KeyboardData.prefs(this).getBoolean("private_mode", false) ? "Tắt riêng tư thủ công" : "Bật riêng tư thủ công", () -> {
             KeyboardData.prefs(this).edit().putBoolean("private_mode", !KeyboardData.prefs(this).getBoolean("private_mode", false)).apply(); onStartInputView(getCurrentInputEditorInfo(), false);
         });
@@ -1025,22 +1038,26 @@ public class TranslatorImeService extends InputMethodService {
         panelAction(list, "Cấu hình AI / hạn mức VNĐ", () -> startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         panelScroll(list, 245);
     }
-    private void showClipboardPanel() {
-        LinearLayout controls = new LinearLayout(this);
-        addTool(controls, "Ghim", "Đọc và ghim clipboard", () -> {
-            if (privateEditor) { toast("Ô riêng tư không đọc clipboard."); return; }
-            ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (manager == null || !manager.hasPrimaryClip() || manager.getPrimaryClip() == null) { toast("Clipboard trống."); return; }
-            try { KeyboardData.pin(this, String.valueOf(manager.getPrimaryClip().getItemAt(0).coerceToText(this))); rebuildKeyboard(); } catch (Exception e) { toast(e.getMessage()); }
+    private void showClipboardPanel(){
+        LinearLayout controls=new LinearLayout(this);
+        addTool(controls,"Ghim hiện tại","Ghim nội dung clipboard",()->{
+            if(privateEditor){toast("Ô riêng tư không đọc clipboard.");return;}
+            try{android.content.ClipData clip=clipboardManager==null?null:clipboardManager.getPrimaryClip();if(clip==null||clip.getItemCount()==0||clip.getItemAt(0).getText()==null){toast("Clipboard chưa có văn bản.");return;}KeyboardData.pin(this,clip.getItemAt(0).getText().toString());rebuildKeyboard();}catch(Exception e){toast(e.getMessage());}
         });
-        addTool(controls, "Dán", "Dán clipboard", () -> editAction(android.R.id.paste)); addTool(controls, "ABC", "Trở về", () -> openPanel(0)); keyboardRoot.addView(controls);
-        LinearLayout list = vertical(); JSONArray items = privateEditor ? new JSONArray() : KeyboardData.pins(this);
-        for (int i = 0; i < items.length(); i++) {
-            String text = items.optJSONObject(i).optString("text"); Button button = panelAction(list, text, () -> { commit(text); openPanel(0); });
-            button.setOnLongClickListener(v -> { KeyboardData.unpin(this, text); rebuildKeyboard(); return true; });
-        }
-        if (items.length() == 0) list.addView(resultLine("Chưa có mục ghim. Giữ một mục để bỏ ghim. Nội dung hết hạn được dọn khi mở."));
-        panelScroll(list, 220);
+        addTool(controls,"Xóa tất cả","Xóa lịch sử và mục ghim",()->{ClipboardMemory.clear(this);toast("Đã xóa bộ nhớ cục bộ.");rebuildKeyboard();});
+        addTool(controls,"ABC","Trở về bàn phím",()->openPanel(0));keyboardRoot.addView(controls);
+        LinearLayout list=vertical();
+        android.widget.CheckBox enabled=new android.widget.CheckBox(this);enabled.setText("Lưu clipboard cục bộ khi Android cho phép (24 giờ)");enabled.setChecked(KeyboardData.prefs(this).getBoolean("clipboard_auto",false));enabled.setEnabled(!privateEditor);
+        enabled.setOnCheckedChangeListener((v,on)->{KeyboardData.prefs(this).edit().putBoolean("clipboard_auto",on).apply();if(on)ClipboardMemory.capture(this,privateEditor);rebuildKeyboard();});list.addView(enabled);
+        if(privateEditor){list.addView(resultLine("Ô riêng tư không đọc hoặc lưu clipboard."));panelScroll(list,235);return;}
+        JSONArray pins=KeyboardData.pins(this),recent=ClipboardMemory.history(this);java.util.Set<String> pinned=new java.util.HashSet<>();for(int i=0;i<pins.length();i++){String value=pins.optJSONObject(i).optString("text");pinned.add(value);clipboardRow(list,value,true);}
+        for(int i=0;i<recent.length();i++){String value=recent.optJSONObject(i).optString("text");if(!pinned.contains(value))clipboardRow(list,value,false);}
+        if(pins.length()==0&&recent.length()==0)list.addView(resultLine("Bật lưu clipboard rồi sao chép văn bản. Không lưu nội dung được đánh dấu nhạy cảm; tối đa 30 mục gần đây. Chạm mục để dán."));panelScroll(list,235);
+    }
+    private void clipboardRow(LinearLayout list,String value,boolean pinned){
+        Button paste=panelAction(list,(pinned?"📌 ":"")+value,()->{commit(value);openPanel(0);});paste.setMaxLines(3);paste.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout row=new LinearLayout(this);addTool(row,pinned?"Bỏ ghim":"Ghim","Giữ nội dung trong bộ nhớ",()->{try{if(pinned)KeyboardData.unpin(this,value);else KeyboardData.pin(this,value);rebuildKeyboard();}catch(Exception e){toast(e.getMessage());}});
+        addTool(row,"Xóa","Xóa mục",()->{KeyboardData.unpin(this,value);ClipboardMemory.remove(this,value);rebuildKeyboard();});list.addView(row);
     }
     private void showTemplatePanel() {
         JSONArray items = KeyboardData.templates(this); LinkedHashSet<String> groups = new LinkedHashSet<>(); groups.add("Tất cả");
