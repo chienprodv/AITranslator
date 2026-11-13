@@ -864,6 +864,7 @@ public class TranslatorImeService extends InputMethodService {
         commit(" ");
     }
     private void replaceBefore(String old, String replacement) {
+        ignoreSelectionUntil=android.os.SystemClock.uptimeMillis()+500;
         InputConnection ic = getCurrentInputConnection(); if (ic == null) return;
         String before = Draft.text(ic.getTextBeforeCursor(Math.max(512, old.length()), 0));
         if (!before.endsWith(old)) return;
@@ -889,6 +890,7 @@ public class TranslatorImeService extends InputMethodService {
         } else { undoEdit = null; editAction(android.R.id.undo); toast("Đã yêu cầu ứng dụng hoàn tác nếu được hỗ trợ."); }
     }
     private void moveCursor(int delta) {
+        ignoreSelectionUntil=android.os.SystemClock.uptimeMillis()+500;
         InputConnection ic = getCurrentInputConnection(); if (ic == null) return;
         stopVoice(); invalidateTranslation(); TelexComposer.reset(); swipeChoice = false;
         ExtractedText text = ic.getExtractedText(new ExtractedTextRequest(), 0);
@@ -907,6 +909,7 @@ public class TranslatorImeService extends InputMethodService {
         updateCandidates();
     }
     private void editAction(int action) {
+        ignoreSelectionUntil=android.os.SystemClock.uptimeMillis()+500;
         InputConnection ic = getCurrentInputConnection(); if (ic == null) return;
         stopVoice(); invalidateTranslation(); TelexComposer.reset(); ic.performContextMenuAction(action); updateCandidates();
     }
@@ -1074,6 +1077,7 @@ public class TranslatorImeService extends InputMethodService {
         panelScroll(list, 225);
     }
     private void selectPlaceholder() {
+        ignoreSelectionUntil=android.os.SystemClock.uptimeMillis()+500;
         InputConnection ic = getCurrentInputConnection(); if (ic == null) return;
         ExtractedText text = ic.getExtractedText(new ExtractedTextRequest(), 0);
         if (text == null || text.text == null) { toast("Chạm chọn ô [ ] để điền."); return; }
