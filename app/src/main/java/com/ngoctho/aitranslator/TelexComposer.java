@@ -102,6 +102,11 @@ public final class TelexComposer {
         char[] chars = word.toCharArray();
         int last = -1;
         for (int i = 0; i < chars.length; i++) if (isVowel(chars[i])) last = i;
+        // A delayed modifier belongs to the preceding shapeable vowel, including oi/ui/ay.
+        if(last>0&&"iy".indexOf(baseVowel(chars[last]))>=0){
+            int previous=last-1;
+            if("aouăơư".indexOf(baseVowel(chars[previous]))>=0)last=previous;
+        }
         if (last < 0) return word;
         int tone = wordTone(word);
         char base = baseVowel(chars[last]);
